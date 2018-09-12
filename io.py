@@ -22,16 +22,20 @@ class Recording:
     (e.g. python) or column-major (e.g. matlab). To take this difference into
     account the order argument should be carefully checked.
 
+    Note: for performance reasons it is assumed that the recording has been
+    preprocessed accordingly. This package does not provide support for 
+    preprocessing for now.
+
     Args:
         fn (str): path to the binary recording
 
-        nb_channels (int): number of recording channels
+        probe_fn (string): path to probe file
 
         sampling_rate (int): sampling rate of the provided data 
 
         dtype (str): datatype of given binary recording
 
-        mode (str): load mode (see numpy.memmap), 'r' is (default)
+        mode (str): load mode (see numpy.memmap), 'c' is (default)
 
         order (str): 'C' (row-major) or 'F' (column-major) type of binary
 
@@ -41,12 +45,22 @@ class Recording:
         sampling_rate (int): sampling rate of the data
     """
 
-    def __init__(self, fn, nb_channels, sampling_rate, dtype,
-                 mode='r', order='C'):
+    def __init__(self, fn, probe_fn, sampling_rate, dtype,
+                 mode='c', order='C'):
+        # keep track of parameter for dump
+        self._fn = fn
+        self._dtype = dtype
+
+        # load the probe file
+        self.probe = Probe(probe_fn)
+
         # load actual data
         # don't reshape yet, 'cause we need to know the actual size first
         self.data = np.memmap(fn, dtype, mode)
 
+        # NOTE: we don't remove the bad channels here for performance reasons,
+        # selecting the data would load the entire array into memory
+        nb_channels = self.probe.total_nb_channels
         # check if nb_channels fits the data
         assert self.data.size / nb_channels == self.data.size // nb_channels,\
                "the given nb_channels does not match the given data"
@@ -57,7 +71,17 @@ class Recording:
                                        order=order)
         self.sampling_rate = sampling_rate
 
-    def isWritable(self):
+    def get_nb_good_channels(self):
+        """ Return the number of working channels
+        """
+        return self.probe.channels.size
+
+    def get_duration(self):
+        """ Return the number of samples recorded per channel
+        """
+        return self.data.shape[1]
+
+    def is_writable(self):
         """ Return whether or not this Recording is writable 
         """
         return self.data.flags.writeable
@@ -67,14 +91,18 @@ class Recording:
         """
         self.data.flush()
 
-    def unload(self):
-        """ Unload the recording data
+    def save_raw(self):
+        """  Save the data in raw format in the original data folder
         """
-        if self.isWritable():
-            self.flush()
+        fn, ext = os.path.splitext(self._fn)
+        fn = '{}_altered{}'.format(fn, ext)
+        self.data.tofile(fn)
 
-        # remove reference
-        self.data = None
+    def save_npy(self):
+        """ Save the data in npy format in the original data folder
+        """
+        fn, _ = os.path.splitext(self._fn)
+        np.save(fn, self.data)
 
 
 class Phy:
@@ -149,3 +177,29 @@ class Phy:
         """ Return all spike times
         """
         return np.load(self._get_path_to(Phy._SPIKE_TIMES))
+
+
+class Probe:
+    """ Class exposing the probe file. Supporting only single-shank 
+    with shank id 1.
+
+    Args:
+        probe_fn (string): full path and filename to the probe file
+
+    Attributes:
+        channels (ndarray): array containing the good channels
+
+        total_nb_channels (int): total number of channels on the probe
+    """
+
+    def __init__(self, probe_fn):
+        variables = {}
+        # execute the probe file
+        exec(open(probe_fn).read(), variables)
+
+        # extract channels from probe
+        self.channels = variables['channel_groups'][1]['channels']
+        self.channels = np.array(self.channels)
+
+        # extract total number of channels
+        self.total_nb_channels = variables['total_nb_channels']
