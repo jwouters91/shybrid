@@ -40,3 +40,5 @@ plt.plot(spikeTrain.template.data.T)
 
 plt.figure()
 plt.plot(spikeTrain.template.PC.T)
+
+spikeTrain.subtract_train()

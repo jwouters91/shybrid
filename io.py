@@ -104,6 +104,11 @@ class Recording:
         fn, _ = os.path.splitext(self._fn)
         np.save(fn, self.data)
 
+    def get_good_chunk(self, start, end):
+        """ Return a chunk of data with only good channels
+        """
+        return self.data[self.probe.channels,start:end]
+
 
 class Phy:
     """ Phy class that exposes spike sorting results and manual curation
