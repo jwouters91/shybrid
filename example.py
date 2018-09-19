@@ -42,3 +42,4 @@ plt.figure()
 plt.plot(spikeTrain.template.PC.T)
 
 spikeTrain.subtract_train(plot=True)
+spikeTrain.insert_train()

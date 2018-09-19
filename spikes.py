@@ -72,7 +72,6 @@ class SpikeTrain:
                 plt.plot((chunk+spacing).T, 'b')
                 plt.plot((fitted_waveform+spacing).T, 'g')
                 plt.plot((fitted_waveform_wo+spacing).T, 'r')
-                print(res_fit)
 
             # subtract
             self.recording.data[channels, start:end] = \
@@ -81,10 +80,29 @@ class SpikeTrain:
     def insert_train(self, use_fit=True, permutate_channels=True):
         """ Re-insert spike train with the desired randomness
         """
-        if permutate_channels:
-            if self.permutation is None:
+        if permutate_channels and self.permutation is None:
                 self.permutation = \
                     np.random.permutation(self.template.data.shape[0])
+        else:
+            self.permutation = np.arange(self.tempalte.data.shape[0])
+
+        # good channels
+        channels = self.recording.probe.channels
+
+        for spike_idx in range(self.get_nb_spikes()):
+            if use_fit:
+                insert_waveform = \
+                    self.template.get_fitted_waveform(self._template_fitting[spike_idx],
+                                                      self._residual_fitting[spike_idx])
+                insert_waveform = insert_waveform[self.permutation]
+            else:
+                insert_waveform = self.template.data[self.permutation]
+
+            start, end = self.get_spike_start_end(self.spikes[spike_idx])
+
+            self.recording.data[channels, start:end] = \
+                 self.recording.data[channels, start:end] + insert_waveform
+
 
     def get_spike_start_end(self, spike):
         """ Get start and end for the given spike
@@ -109,7 +127,8 @@ class Template:
         window_size (int): window size used to determine te template
 
         realign (boolean, optional): realign spikes based on template matched
-        filter
+        filter. Realign will also affect the spike train given to this
+        function.
     """
 
     def __init__(self, spike_train, window_size, realign=False):
