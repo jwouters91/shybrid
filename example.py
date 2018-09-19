@@ -5,6 +5,7 @@ Created on Wed Sep 12 17:19:06 2018
 
 @author: jwouters
 """
+import numpy as np
 import matplotlib.pyplot as plt
 
 from hybridizer.io import Recording, Phy
@@ -20,6 +21,7 @@ phy_path = '/media/jwouters/DATA/UMC_UTRECHT/thesis_Julien/c2/data1/data1.GUI'
 fs = 4096
 dtype = 'float32'
 order = 'F' # data was generated in matlab
+save_output = True
 
 # create objects
 recording = Recording(rec_fn, prb_fn, fs, dtype, order=order)
@@ -41,5 +43,12 @@ plt.plot(spikeTrain.template.data.T)
 plt.figure()
 plt.plot(spikeTrain.template.PC.T)
 
-spikeTrain.subtract_train(plot=True)
+spikeTrain.subtract_train(plot=False)
+
+if save_output: recording.save_raw(suffix="subtracted")
+
 spikeTrain.insert_train()
+
+if save_output: recording.save_raw(suffix="hybrid")
+
+# visualize data: compare original to subtracted to hybrid

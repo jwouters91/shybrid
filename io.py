@@ -91,12 +91,12 @@ class Recording:
         """
         self.data.flush()
 
-    def save_raw(self):
+    def save_raw(self, suffix='altered'):
         """  Save the data in raw format in the original data folder
         """
         fn, ext = os.path.splitext(self._fn)
-        fn = '{}_altered{}'.format(fn, ext)
-        self.data.tofile(fn)
+        fn = '{}_{}{}'.format(fn, suffix, ext)
+        self.data.T.tofile(fn)
 
     def save_npy(self):
         """ Save the data in npy format in the original data folder

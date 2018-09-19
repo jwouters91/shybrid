@@ -210,6 +210,7 @@ class Template:
 
         self.PC = PCs[:,0].reshape((spike_tensor.shape[1],
                                     spike_tensor.shape[2]))
+        self.PC = np.real(self.PC)
 
     def _fit_template(self, chunk):
         """ Fit the given chunk to the template
