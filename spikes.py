@@ -130,7 +130,6 @@ class Template:
         self.data = np.median(spike_tensor, axis=0)
 
         if realign:
-            # todo implement oversampling
             offsets = np.zeros(spike_train.get_nb_spikes())
             for spike_idx in range(spike_train.get_nb_spikes()):
                 start = int(spike_train.spikes[spike_idx] - window_size/2)
@@ -139,26 +138,23 @@ class Template:
                 chunk =  spike_train.recording.get_good_chunk(start,
                                                               end)
 
-                # shift template 5 left to 5 right (11 correlation points)
-                temporal_shifts = np.arange(11) - 5
-
                 # align on shorter window to avoid boundary effects
                 sub_start = int((self.window_size/2) - (self.window_size * 0.1))
                 sub_end = int(sub_start + self.window_size * 0.2)
 
                 sub_template = self.data[:,sub_start:sub_end]
+                sub_chunk = chunk[:,sub_start:sub_end]
 
-                # shift template 5 left to 5 right (11 correlation points)
-                temporal_shifts = np.arange(11) - 5
-                max_corr = 0
-                offset = None
-                for shift in temporal_shifts:
-                    sub_chunk = chunk[:,(sub_start+shift):(sub_end+shift)]
-                    corr = np.sum(sub_template * sub_chunk)
+                # find most dominant signal minima in sub template
+                template_min = np.min(sub_template, axis=1)
+                sorted_idxs = np.argsort(template_min)
+                sorted_idxs = sorted_idxs[:int(0.1*sub_template.shape[0])]
 
-                    if corr >= max_corr:
-                        offset = shift
-                        max_corr = corr
+                # template dips
+                template_dips = np.argmin(sub_template[sorted_idxs], axis=1)
+                chunk_dips = np.argmin(sub_chunk[sorted_idxs], axis=1)
+
+                offset = np.round(np.mean(chunk_dips - template_dips))
 
                 offsets[spike_idx] = offset
 
