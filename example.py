@@ -33,7 +33,7 @@ spike_times = sorting_info.get_cluster_activation(good_cluster)
 spikeTrain = SpikeTrain(recording,spike_times)
 
 # calculate template and show
-spikeTrain.calculate_template()
+spikeTrain.calculate_template(realign=True)
 
 plt.figure()
 plt.plot(spikeTrain.template.data.T)
@@ -41,4 +41,4 @@ plt.plot(spikeTrain.template.data.T)
 plt.figure()
 plt.plot(spikeTrain.template.PC.T)
 
-spikeTrain.subtract_train()
+spikeTrain.subtract_train(plot=True)
