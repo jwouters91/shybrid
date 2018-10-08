@@ -36,7 +36,7 @@ class SpikeTrain:
         """
         return self.spikes.size
 
-    def subtract_train(self, plot=False):
+    def subtract_train(self, plot=False, fitOnly=False):
         """ Subtract spike train from the recording.
         """
         # keep track of the fitting factor for later insertion
@@ -60,6 +60,9 @@ class SpikeTrain:
             self._template_fitting[idx] = temp_fit
             self._residual_fitting[idx] = res_fit
 
+            if fitOnly:
+                continue
+
             fitted_waveform = self.template.get_fitted_waveform(temp_fit,
                                                                 res_fit)
 
@@ -77,14 +80,19 @@ class SpikeTrain:
             self.recording.data[channels, start:end] = \
                  self.recording.data[channels, start:end] - fitted_waveform
 
-    def insert_train(self, use_fit=True, permutate_channels=True):
+    def insert_train(self, use_fit=True, permutate_channels=True,
+                     spatial_map='random'):
         """ Re-insert spike train with the desired randomness
         """
         if permutate_channels and self.permutation is None:
+            if spatial_map == 'random':
                 self.permutation = \
                     np.random.permutation(self.template.data.shape[0])
+            elif spatial_map == 'reverse':
+                self.permutation = np.arange(self.template.data.shape[0])
+                self.permutation = np.flip(self.permutation, 0)
         else:
-            self.permutation = np.arange(self.tempalte.data.shape[0])
+            self.permutation = np.arange(self.template.data.shape[0])
 
         # good channels
         channels = self.recording.probe.channels

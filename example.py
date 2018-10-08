@@ -47,7 +47,7 @@ spikeTrain.subtract_train(plot=False)
 
 if save_output: recording.save_raw(suffix="subtracted")
 
-spikeTrain.insert_train()
+spikeTrain.insert_train(spatial_map="reverse")
 
 if save_output: recording.save_raw(suffix="hybrid")
 

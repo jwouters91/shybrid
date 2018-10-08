@@ -208,3 +208,18 @@ class Probe:
 
         # extract total number of channels
         self.total_nb_channels = variables['total_nb_channels']
+
+        # extract geometry
+        self.geometry = variables['channel_groups'][1]['geometry']
+
+    def get_min_geometry(self):
+        """ Return the minimum geometry value for each dimension in a single
+        ndarray
+        """
+        return np.array(list(self.geometry.values())).min(axis=0)
+
+    def get_max_geometry(self):
+        """ Return the minimum geometry value for each dimension in a single
+        ndarray
+        """
+        return np.array(list(self.geometry.values())).max(axis=0)
