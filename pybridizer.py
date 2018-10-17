@@ -32,6 +32,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
         # helper variables
         self._select_path = os.path.expanduser('~')
+        self.GUI_enabled = True
 
         # connect listeners
         self.btnDataSelect.clicked.connect(self.select_data)
@@ -126,6 +127,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                                             'Please provide the desired spike window size')
         else:
             if calcTemp:
+                self.disable_GUI()
+
                 # TODO provide more check to validate that the given value is a double
                 # TODO bis clear canvas
                 self.spike_times = self.phy.get_cluster_activation(self._current_cluster)
@@ -134,6 +137,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                 # calculate template and show
                 self._window_samples = int(np.ceil(float(self.fieldWindowSize.text()) / 1000 * self.recording.sampling_rate))
                 self.spikeTrain.calculate_template(realign=True, window_size=self._window_samples)
+
+                self.enable_GUI()
 
             # draw template
             self.axes.clear()
@@ -339,6 +344,78 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.labelSpike.setText('{}/{} '.format(int(self._current_spike)+1,
                                                 int(self.spikeTrain.spikes.size)))
         self.render_current_spike()
+
+    def build_GUI_status_dict(self):
+        # empty previous one or init
+        self.GUI_status = {}
+
+        # fill GUI status dictionary
+        self.GUI_status['btnDataSelect'] = self.btnDataSelect.isEnabled()
+        self.GUI_status['listClusterSelect'] = self.listClusterSelect.isEnabled()
+        self.GUI_status['fieldWindowSize'] = self.fieldWindowSize.isEnabled()
+        self.GUI_status['btnDraw'] = self.btnDraw.isEnabled()
+        self.GUI_status['radioTemplate'] = self.radioTemplate.isEnabled()
+        self.GUI_status['radioFit'] = self.radioFit.isEnabled()
+        self.GUI_status['btnLeftSpike'] = self.btnLeftSpike.isEnabled()
+        self.GUI_status['btnRightSpike'] = self.btnRightSpike.isEnabled()
+        self.GUI_status['radioMove'] = self.radioMove.isEnabled()
+        self.GUI_status['btnMoveLeft'] = self.btnMoveLeft.isEnabled()
+        self.GUI_status['btnMoveUp'] = self.btnMoveUp.isEnabled()
+        self.GUI_status['btnMoveRight'] = self.btnMoveRight.isEnabled()
+        self.GUI_status['btnMoveDown'] = self.btnMoveDown.isEnabled()
+        self.GUI_status['btnReset'] = self.btnReset.isEnabled()
+        self.GUI_status['btnExport'] = self.btnExport.isEnabled()
+        self.GUI_status['horizontalSlider'] = self.horizontalSlider.isEnabled()
+
+    def disable_GUI(self):
+        if self.GUI_enabled:
+            # prevent losing status dict
+            self.GUI_enabled = False
+
+            # build dict
+            self.build_GUI_status_dict()
+
+            # disable GUI
+            self.btnDataSelect.setEnabled(False)
+            self.listClusterSelect.setEnabled(False)
+            self.fieldWindowSize.setEnabled(False)
+            self.btnDraw.setEnabled(False)
+            self.radioTemplate.setEnabled(False)
+            self.radioFit.setEnabled(False)
+            self.btnLeftSpike.setEnabled(False)
+            self.btnRightSpike.setEnabled(False)
+            self.radioMove.setEnabled(False)
+            self.btnMoveLeft.setEnabled(False)
+            self.btnMoveUp.setEnabled(False)
+            self.btnMoveRight.setEnabled(False)
+            self.btnMoveDown.setEnabled(False)
+            self.btnReset.setEnabled(False)
+            self.btnExport.setEnabled(False)
+            self.horizontalSlider.setEnabled(False)
+
+            # for redraw
+            self.repaint()
+
+    def enable_GUI(self):
+        self.btnDataSelect.setEnabled(self.GUI_status['btnDataSelect'])
+        self.listClusterSelect.setEnabled(self.GUI_status['listClusterSelect'])
+        self.fieldWindowSize.setEnabled(self.GUI_status['fieldWindowSize'])
+        self.btnDraw.setEnabled(self.GUI_status['btnDraw'])
+        self.radioTemplate.setEnabled(self.GUI_status['radioTemplate'])
+        self.radioFit.setEnabled(self.GUI_status['radioFit'])
+        self.btnLeftSpike.setEnabled(self.GUI_status['btnLeftSpike'])
+        self.btnRightSpike.setEnabled(self.GUI_status['btnRightSpike'])
+        self.radioMove.setEnabled(self.GUI_status['radioMove'])
+        self.btnMoveLeft.setEnabled(self.GUI_status['btnMoveLeft'])
+        self.btnMoveUp.setEnabled(self.GUI_status['btnMoveUp'])
+        self.btnMoveRight.setEnabled(self.GUI_status['btnMoveRight'])
+        self.btnMoveDown.setEnabled(self.GUI_status['btnMoveDown'])
+        self.btnReset.setEnabled(self.GUI_status['btnReset'])
+        self.btnExport.setEnabled(self.GUI_status['btnExport'])
+        self.horizontalSlider.setEnabled(self.GUI_status['horizontalSlider'])
+
+        self.GUI_enabled = True
+
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
