@@ -393,7 +393,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self.btnExport.setEnabled(False)
             self.horizontalSlider.setEnabled(False)
 
-            # for redraw
+            # force redraw
             self.repaint()
 
     def enable_GUI(self):
