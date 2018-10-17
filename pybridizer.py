@@ -248,13 +248,22 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             geo_x = geo[0] - self.x_shift * x_between
             geo_y = geo[1] - self.y_shift * y_between
 
+            interpolated_waveform = np.zeros(self.spikeTrain.template.data[0].shape)
+            interpolation_count = 0
+            interpolation_needed = True
             for jdx, project_channel in enumerate(self.recording.probe.channels):
                 project_geo = self.recording.probe.geometry[project_channel]
+
                 if geo_x == project_geo[0] and geo_y == project_geo[1]:
                     shifted_template[idx] = self.spikeTrain.template.data[jdx]
+                    interpolation_needed = False
                 else:
-                    # TODO interpolation
-                    pass
+                    if abs(geo_x - project_geo[0]) <= x_between and abs(geo_y - project_geo[1]) <= y_between:
+                        interpolated_waveform += self.spikeTrain.template.data[jdx]
+                        interpolation_count += 1
+
+            if interpolation_needed and interpolation_count > 0:
+                shifted_template[idx] = interpolated_waveform / interpolation_count
 
         return shifted_template
 
