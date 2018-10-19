@@ -22,8 +22,9 @@ from hybridizer.spikes import SpikeTrain
 
 CHOOSE_CLUSTER = 'select cluster'
 TEMPLATE_COLOR = '#1F77B4'
-SPIKE_COLOR = '#E44A3D'
-MOVE_COLOR = 'g--'
+SPIKE_COLOR = 'salmon'
+MOVE_COLOR = '#1F77B4'
+ENERGY_COLOR = 'salmon'
 
 class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
     def __init__(self, parent=None):
@@ -50,6 +51,9 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.btnMoveUp.clicked.connect(self.move_up)
         self.btnMoveDown.clicked.connect(self.move_down)
         self.btnReset.clicked.connect(self.move_template)
+        self.checkBoxLower.clicked.connect(lambda: self.set_energy_lb(draw=True))
+        self.checkBoxUpper.clicked.connect(lambda: self.set_energy_ub(draw=True))
+        self.btnMove.clicked.connect(self.execute_move)
 
         #set up plotting area
         canvas = FigureCanvas(plt.figure())
@@ -138,6 +142,11 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                 self._window_samples = int(np.ceil(float(self.fieldWindowSize.text()) / 1000 * self.recording.sampling_rate))
                 self.spikeTrain.calculate_template(realign=True, window_size=self._window_samples)
 
+                self.checkBoxLower.setChecked(False)
+                self.set_energy_lb(draw=False)
+                self.checkBoxUpper.setChecked(False)
+                self.set_energy_ub(draw=False)
+
                 self.enable_GUI()
 
             # draw template
@@ -157,6 +166,9 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self.move_template_enabled(False)
 
     def template_fit(self):
+        # init fit factors
+        self.spikeTrain.subtract_train(fitOnly=True)
+
         # plot first spike fitted on template
         self._current_spike = 0
         self.render_current_spike()
@@ -174,23 +186,27 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.horizontalSlider.setValue(0)
         self.horizontalSlider.valueChanged.connect(self.slide_spike)
 
+        self.checkBoxLower.setEnabled(enabled)
+        self.checkBoxUpper.setEnabled(enabled)
+
         if enabled == True:
             self.labelSpike.setText('1/{} '.format(int(self.spikeTrain.spikes.size)))
         else:
             self.labelSpike.setText('')
 
-        self.btnExport.setEnabled(False)
+        self.btnMove.setEnabled(False)
         self.btnReset.setEnabled(False)
 
     def render_current_spike(self):
-        self.axes.lines = []
+        self.clear_canvas()
 
-        spike_time = self.spikeTrain.spikes[self._current_spike]
+        self.plot_energy()
+
+        # default sort using fitting energy
+        spike_time = self.spikeTrain.retrieve_energy_sorted_spike_time(self._current_spike)
         start, end = self.spikeTrain.get_spike_start_end(spike_time)
         spike = self.recording.get_good_chunk(start,end)
 
-        # init fit factors
-        self.spikeTrain.subtract_train(fitOnly=True)
         fit = self.spikeTrain._template_fitting[self._current_spike]
 
         self.plot_multichannel(spike, color=SPIKE_COLOR, scaling=self._template_scaling/fit)
@@ -209,25 +225,25 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.x_shift -= 1
         self.render_shifted_template()
         self.btnReset.setEnabled(True)
-        self.btnExport.setEnabled(True)
+        self.btnMove.setEnabled(True)
 
     def move_right(self):
         self.x_shift += 1
         self.render_shifted_template()
         self.btnReset.setEnabled(True)
-        self.btnExport.setEnabled(True)
+        self.btnMove.setEnabled(True)
 
     def move_up(self):
         self.y_shift += 1
         self.render_shifted_template()
         self.btnReset.setEnabled(True)
-        self.btnExport.setEnabled(True)
+        self.btnMove.setEnabled(True)
 
     def move_down(self):
         self.y_shift -= 1
         self.render_shifted_template()
         self.btnReset.setEnabled(True)
-        self.btnExport.setEnabled(True)
+        self.btnMove.setEnabled(True)
 
     def move_template_enabled(self, enabled):
         self.btnMoveLeft.setEnabled(enabled)
@@ -235,8 +251,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.btnMoveRight.setEnabled(enabled)
         self.btnMoveDown.setEnabled(enabled)
 
-        self.btnExport.setEnabled(False)
-        self.btnReset.setEnabled(False)
+        self.btnMove.setEnabled(False)
+        self.btnMove.setEnabled(False)
 
     def calculate_shifted_template(self):
         # init template
@@ -273,7 +289,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         return shifted_template
 
     def render_shifted_template(self):
-        self.axes.lines = []
+        self.clear_canvas()
         #self.plot_multichannel(self.spikeTrain.template.data)
 
         # calculate template permutation
@@ -302,7 +318,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         max_dat = data.max()
 
         dat_range = 0.5 * (max_dat - min_dat)
-        
+
         if dat_range == 0:
             # everything zero
             dat_range = 1
@@ -328,6 +344,97 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.axes.figure.canvas.draw()
 
         return scaling
+
+    def plot_energy(self):
+        # gather data
+        energy = self.spikeTrain._fitting_energy.copy()
+
+        # try to see if the available sorting corresponds to the current cluster
+        try:
+            if self._sorted_idxs_cluster != self._current_cluster:
+                self._sorted_idxs = np.argsort(energy)
+                self._sorted_idxs_cluster = self._current_cluster
+        except AttributeError:
+            self._sorted_idxs = np.argsort(energy)
+            self._sorted_idxs_cluster = self._current_cluster
+
+        energy = energy[self._sorted_idxs] # TODO let SpikeTrain do the sorting
+
+        energy = energy - energy.min()
+        energy = energy / energy.max()
+
+        xlim = self.axes.get_xlim()
+        ylim = self.axes.get_ylim()
+
+        y_range = (ylim[1] - ylim[0]) / 15
+        energy = energy * y_range + ylim[0]
+        bottom = np.zeros(energy.shape) + ylim[0]
+
+        x_range = xlim[1] - xlim[0]
+        xpct = x_range * 0.005
+
+        x = np.linspace(xlim[0]+xpct, xlim[1]-xpct, num=energy.size)
+
+        self.axes.plot(x, energy, ENERGY_COLOR, zorder=1)
+        self.fill = self.axes.fill_between(x, energy, bottom,
+                                           color=ENERGY_COLOR)
+
+        try:
+            if self._energy_LB is not None:
+                self.axes.plot(x[:(self._energy_LB+1)],
+                               energy[:(self._energy_LB+1)],
+                               'gray', zorder=1)
+                self.fill_LB = self.axes.fill_between(x[:(self._energy_LB+1)],
+                                                   energy[:(self._energy_LB+1)],
+                                                   bottom[:(self._energy_LB+1)],
+                                                   color='gray')
+        except AttributeError:
+            pass
+
+        try:
+            if self._energy_UB is not None:
+                UB_idx = self._energy_UB - energy.size
+    
+                self.axes.plot(x[UB_idx:], energy[UB_idx:], 'gray', zorder=1)
+                self.fill_UB = self.axes.fill_between(x[UB_idx:],
+                                                   energy[UB_idx:],
+                                                   bottom[UB_idx:],
+                                                   color='gray')
+        except AttributeError:
+            pass
+
+        self.vline = self.axes.vlines(x[self._current_spike], ylim[0],
+                                      energy[self._current_spike],
+                                      color='darkslategray',
+                                      linewidth=3, zorder=2)
+        self.axes.plot(x[self._current_spike], energy[self._current_spike],
+                       color='darkslategray', marker='|')
+
+        self.axes.figure.canvas.draw()
+
+    def clear_canvas(self):
+        # clear regular lines
+        self.axes.lines = []
+
+        # clear the non-line objects we are keeping track of, if they exist
+        try:
+            self.vline.remove()
+            self.fill.remove()
+        except:
+            # ignore, objects don't exist
+            pass 
+
+        # try separate for LB
+        try:
+            self.fill_LB.remove()
+        except:
+            pass
+
+        # try separate for UB
+        try:
+            self.fill_UB.remove()
+        except:
+            pass
 
     def lower_spike(self):
         if self._current_spike > 0:
@@ -366,6 +473,9 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.GUI_status['btnReset'] = self.btnReset.isEnabled()
         self.GUI_status['btnExport'] = self.btnExport.isEnabled()
         self.GUI_status['horizontalSlider'] = self.horizontalSlider.isEnabled()
+        self.GUI_status['checkBoxLower'] = self.checkBoxLower.isEnabled()
+        self.GUI_status['checkBoxUpper'] = self.checkBoxUpper.isEnabled()
+        self.GUI_status['btnMove'] = self.btnMove.isEnabled()
 
     def disable_GUI(self):
         if self.GUI_enabled:
@@ -392,6 +502,9 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self.btnReset.setEnabled(False)
             self.btnExport.setEnabled(False)
             self.horizontalSlider.setEnabled(False)
+            self.checkBoxLower.setEnabled(False)
+            self.checkBoxUpper.setEnabled(False)
+            self.btnMove.setEnabled(False)
 
             # force redraw
             self.repaint()
@@ -416,6 +529,33 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
         self.GUI_enabled = True
 
+    def set_energy_lb(self, draw=True):
+        if self.checkBoxLower.isChecked():
+            self._energy_LB = self._current_spike
+            self.labelLB.setText('{}'.format(int(self._energy_LB+1)))
+        else:
+            self._energy_LB = None
+            self.labelLB.setText('')
+
+        if draw:
+            self.render_current_spike()
+
+    def set_energy_ub(self, draw=True):
+        if self.checkBoxUpper.isChecked():
+            self._energy_UB = self._current_spike
+            self.labelUB.setText('{}'.format(int(self._energy_UB+1)))
+        else:
+            self._energy_UB = None
+            self.labelUB.setText('')
+
+        if draw:
+            self.render_current_spike()
+
+    def execute_move(self):
+        pass
+        #self.spikeTrain.subtract_train(plot=False)
+        #self.spikeTrain.insert_train(spatial_map="reverse")
+        
 
 def main():
     app = QtWidgets.QApplication(sys.argv)

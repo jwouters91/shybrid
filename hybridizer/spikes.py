@@ -42,6 +42,7 @@ class SpikeTrain:
         # keep track of the fitting factor for later insertion
         self._template_fitting = np.zeros(self.spikes.shape)
         self._residual_fitting = np.zeros(self.spikes.shape)
+        self._fitting_energy = np.zeros(self.spikes.shape)
 
         channels = self.recording.probe.channels
 
@@ -59,6 +60,9 @@ class SpikeTrain:
 
             self._template_fitting[idx] = temp_fit
             self._residual_fitting[idx] = res_fit
+
+            self._fitting_energy[idx] =\
+                np.sum(self.template.get_fitted_waveform(temp_fit, res_fit)**2)
 
             if fitOnly:
                 continue
@@ -111,7 +115,6 @@ class SpikeTrain:
             self.recording.data[channels, start:end] = \
                  self.recording.data[channels, start:end] + insert_waveform
 
-
     def get_spike_start_end(self, spike):
         """ Get start and end for the given spike
         """
@@ -124,6 +127,19 @@ class SpikeTrain:
         """ Realign spikes according to the given offsets
         """
         self.spikes = self.spikes + offsets
+
+    def retrieve_energy_sorted_spike_time(self, spike_idx):
+        """ Return the spike time from the energy sorted spike train for the
+        given spike_idx
+
+        This method requires that the energies have been initialized already
+        """
+        try:
+            self._energy_sorted_idxs
+        except AttributeError:
+            self._energy_sorted_idxs = np.argsort(self._fitting_energy)
+
+        return self.spikes[self._energy_sorted_idxs[spike_idx]]
 
 
 class Template:
