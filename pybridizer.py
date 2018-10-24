@@ -26,6 +26,7 @@ SPIKE_COLOR = 'salmon'
 MOVE_COLOR = '#1F77B4'
 ENERGY_COLOR = 'salmon'
 
+
 class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
     def __init__(self, parent=None):
         super(self.__class__, self).__init__(parent)
@@ -54,6 +55,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.checkBoxLower.clicked.connect(lambda: self.set_energy_lb(draw=True))
         self.checkBoxUpper.clicked.connect(lambda: self.set_energy_ub(draw=True))
         self.btnMove.clicked.connect(self.execute_move)
+        self.btnExport.clicked.connect(self.export_data)
 
         #set up plotting area
         canvas = FigureCanvas(plt.figure())
@@ -113,11 +115,23 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             # update dropdown
             self.fill_cluster_dropdown()
 
+            # keep track of moves and generated GT
+            self.generated_GT = {}
+
+            # clean up
+            try:
+                del self._sorted_idxs
+                del self._sorted_idxs_cluster
+            except AttributeError:
+                pass
+
+            self.btnExport.setEnabled(False)
+
     def fill_cluster_dropdown(self):
         good_clusters = self.phy.get_good_clusters()
-        good_clusters = [CHOOSE_CLUSTER] + np.sort(good_clusters).astype('str').tolist()
+        self.good_clusters = [CHOOSE_CLUSTER] + np.sort(good_clusters).astype('str').tolist()
         self.listClusterSelect.clear()
-        self.listClusterSelect.addItems(good_clusters)
+        self.listClusterSelect.addItems(self.good_clusters)
 
     def select_cluster(self):
         label = self.listClusterSelect.currentText()
@@ -135,7 +149,11 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
                 # TODO provide more check to validate that the given value is a double
                 # TODO bis clear canvas
-                self.spike_times = self.phy.get_cluster_activation(self._current_cluster)
+                if self._current_cluster in self.generated_GT.keys():
+                    self.spike_times = self.generated_GT[self._current_cluster]
+                else:
+                    # use external
+                    self.spike_times = self.phy.get_cluster_activation(self._current_cluster)
                 self.spikeTrain = SpikeTrain(self.recording, self.spike_times)
 
                 # calculate template and show
@@ -154,13 +172,17 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self._template_scaling = self.plot_multichannel(self.spikeTrain.template.data)
             self.axes.autoscale(False)
 
-            self.plotTitle.setText('Cluster {}'.format(self._current_cluster))
-
             # enable options for further use
             self.radioTemplate.setChecked(True)
-            self.radioFit.setEnabled(True)
-            self.radioMove.setEnabled(True)
             self.radioTemplate.setEnabled(True)
+            self.radioFit.setEnabled(True)
+
+            if self._current_cluster in self.generated_GT.keys():
+                self.radioMove.setEnabled(False)
+                self.plotTitle.setText('Cluster {} [ALREADY MOVED]'.format(self._current_cluster))
+            else:
+                self.radioMove.setEnabled(True)
+                self.plotTitle.setText('Cluster {}'.format(self._current_cluster))
 
             self.template_fit_enabled(False)
             self.move_template_enabled(False)
@@ -186,8 +208,12 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.horizontalSlider.setValue(0)
         self.horizontalSlider.valueChanged.connect(self.slide_spike)
 
-        self.checkBoxLower.setEnabled(enabled)
-        self.checkBoxUpper.setEnabled(enabled)
+        if self._current_cluster in self.generated_GT.keys():
+            self.checkBoxLower.setEnabled(False)
+            self.checkBoxUpper.setEnabled(False)
+        else:
+            self.checkBoxLower.setEnabled(enabled)
+            self.checkBoxUpper.setEnabled(enabled)
 
         if enabled == True:
             self.labelSpike.setText('1/{} '.format(int(self.spikeTrain.spikes.size)))
@@ -257,6 +283,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
     def calculate_shifted_template(self):
         # init template
         shifted_template = np.zeros(self.spikeTrain.template.data.shape)
+        shifted_PC = np.zeros(self.spikeTrain.template.PC.shape)
 
         # TODO extract from data
         x_between = 1
@@ -270,6 +297,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             geo_y = geo[1] - self.y_shift * y_between
 
             interpolated_waveform = np.zeros(self.spikeTrain.template.data[0].shape)
+            interpolated_PC = np.zeros(self.spikeTrain.template.PC[0].shape)
+            # TODO interpolate PC
             interpolation_count = 0
             interpolation_needed = True
             for jdx, project_channel in enumerate(self.recording.probe.channels):
@@ -277,24 +306,29 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
                 if geo_x == project_geo[0] and geo_y == project_geo[1]:
                     shifted_template[idx] = self.spikeTrain.template.data[jdx]
+                    shifted_PC[idx] = self.spikeTrain.template.PC[jdx]
                     interpolation_needed = False
                 else:
                     if abs(geo_x - project_geo[0]) <= x_between and abs(geo_y - project_geo[1]) <= y_between:
                         interpolated_waveform += self.spikeTrain.template.data[jdx]
+                        interpolated_PC += self.spikeTrain.template.PC[jdx]
                         interpolation_count += 1
 
             if interpolation_needed and interpolation_count > 0:
                 shifted_template[idx] = interpolated_waveform / interpolation_count
+                shifted_PC[idx] = interpolated_PC / interpolation_count
 
-        return shifted_template
+        # set those shifted waveforms as class variables for reuse
+        self.shifted_template = shifted_template
+        self.shifted_PC = shifted_PC
 
     def render_shifted_template(self):
         self.clear_canvas()
         #self.plot_multichannel(self.spikeTrain.template.data)
 
         # calculate template permutation
-        shifted_template = self.calculate_shifted_template()
-        self.plot_multichannel(shifted_template, color=MOVE_COLOR)
+        self.calculate_shifted_template()
+        self.plot_multichannel(self.shifted_template, color=MOVE_COLOR)
 
     def plot_multichannel(self, data, color=TEMPLATE_COLOR, scaling=None):
         """ Plot multichannel data on the figure canvas
@@ -385,9 +419,9 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                                energy[:(self._energy_LB+1)],
                                'gray', zorder=1)
                 self.fill_LB = self.axes.fill_between(x[:(self._energy_LB+1)],
-                                                   energy[:(self._energy_LB+1)],
-                                                   bottom[:(self._energy_LB+1)],
-                                                   color='gray')
+                                                      energy[:(self._energy_LB+1)],
+                                                      bottom[:(self._energy_LB+1)],
+                                                      color='gray')
         except AttributeError:
             pass
 
@@ -397,9 +431,9 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
     
                 self.axes.plot(x[UB_idx:], energy[UB_idx:], 'gray', zorder=1)
                 self.fill_UB = self.axes.fill_between(x[UB_idx:],
-                                                   energy[UB_idx:],
-                                                   bottom[UB_idx:],
-                                                   color='gray')
+                                                      energy[UB_idx:],
+                                                      bottom[UB_idx:],
+                                                      color='gray')
         except AttributeError:
             pass
 
@@ -552,10 +586,110 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self.render_current_spike()
 
     def execute_move(self):
-        pass
-        #self.spikeTrain.subtract_train(plot=False)
-        #self.spikeTrain.insert_train(spatial_map="reverse")
-        
+        try:
+            self.spikeTrain.get_energy_sorted_idxs()
+        except AttributeError:
+            # the fits have not yet been calculated
+            self.spikeTrain.subtract_train(fitOnly=True)
+
+        #TODO subtract only subset
+        sorted_idxs = self.spikeTrain.get_energy_sorted_idxs().copy()
+        sorted_spikes = self.spikeTrain.retrieve_energy_sorted_spikes().copy()
+
+        try:
+            if self._energy_LB is None:
+                l_idx = None
+            else:
+                l_idx = self._energy_LB+1 # exclusive
+        except:
+            l_idx = None
+
+        try:
+            if self._energy_UB is None:
+                u_idx = None
+            else:
+                u_idx = self._energy_UB # also exclusive, but handled by python
+        except:
+            u_idx = None
+
+        sorted_spikes_slice = sorted_spikes[l_idx:u_idx]
+        print('{} spikes considered for migration'.format(int(sorted_spikes_slice.size)))
+
+        # add fixed temporal offset to avoid residual correlation
+        time_shift = int(2*self._window_samples)
+        sorted_spikes_insert = sorted_spikes_slice + time_shift
+
+        # subtract train
+        self.spikeTrain.subtract_train(plot=False)
+
+        # insertion shifted template instead of random permutation
+        sorted_template_fit = self.spikeTrain._template_fitting[sorted_idxs]
+        sorted_residual_fit = self.spikeTrain._residual_fitting[sorted_idxs]
+
+        # get good channels
+        channels = self.recording.probe.channels
+
+        inserted_spikes = np.array([])
+        for idx, spike_t in enumerate(sorted_spikes_insert):
+            temp_fit = sorted_template_fit[idx]
+            res_fit = sorted_residual_fit[idx]
+
+            insert_spike = temp_fit * self.shifted_template +\
+                res_fit * self.shifted_PC 
+
+            start, end = self.spikeTrain.get_spike_start_end(spike_t)
+
+            if end > self.recording.get_duration():
+                continue
+
+            self.recording.data[channels, start:end] = \
+                 self.recording.data[channels, start:end] + insert_spike
+
+            inserted_spikes = np.append(inserted_spikes, spike_t)
+
+        print('{} spikes migrated'.format(int(inserted_spikes.size)))
+
+        inserted_spikes.sort()
+
+        # keep track
+        self.generated_GT[self._current_cluster] = inserted_spikes
+
+        self.disable_GUI()
+        self.spikeTrain.update(inserted_spikes)
+        self.enable_GUI()
+
+        # clean up
+        try:
+            del self._sorted_idxs
+            del self._sorted_idxs_cluster
+        except AttributeError:
+            pass
+
+        self.checkBoxLower.setChecked(False)
+        self.set_energy_lb(draw=False)
+        self.checkBoxUpper.setChecked(False)
+        self.set_energy_ub(draw=False)
+
+        # enable export
+        self.btnExport.setEnabled(True)
+
+        self.radioTemplate.setChecked(True)
+        self.draw(calcTemp=False)
+
+        # diable choice in cluster list
+        idx = np.where(np.array(self.good_clusters) == str(int(self._current_cluster)))[0][0]
+        self.listClusterSelect.model().item(idx).setEnabled(False)
+
+    def export_data(self):
+        export_path, _ = \
+            QtWidgets.QFileDialog.getSaveFileName(self,
+                                                  'save hybrid recording',
+                                                  directory=self._select_path,
+                                                  filter='raw recording (*.raw *.bin)')
+
+        self.disable_GUI()
+        self.recording.save_raw(export_path)
+        self.enable_GUI()
 
 def main():
     app = QtWidgets.QApplication(sys.argv)

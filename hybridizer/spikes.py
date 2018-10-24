@@ -36,6 +36,7 @@ class SpikeTrain:
         """
         return self.spikes.size
 
+    #TODO make a separate function to fit
     def subtract_train(self, plot=False, fitOnly=False):
         """ Subtract spike train from the recording.
         """
@@ -115,6 +116,18 @@ class SpikeTrain:
             self.recording.data[channels, start:end] = \
                  self.recording.data[channels, start:end] + insert_waveform
 
+    def update(self, spike_times):
+        """ Update spike times and trigger resets
+        """
+        self.spikes = spike_times
+
+        del self._template_fitting
+        del self._residual_fitting
+        del self._fitting_energy
+        del self._energy_sorted_idxs
+
+        self.calculate_template(self.template.window_size)
+
     def get_spike_start_end(self, spike):
         """ Get start and end for the given spike
         """
@@ -134,12 +147,31 @@ class SpikeTrain:
 
         This method requires that the energies have been initialized already
         """
+        return self.retrieve_energy_sorted_spikes()[spike_idx]
+
+    def retrieve_energy_sorted_spikes(self):
+        """ Return energy sorted spikes
+
+        This method requires that the energies have been initialized already
+        """
         try:
             self._energy_sorted_idxs
         except AttributeError:
             self._energy_sorted_idxs = np.argsort(self._fitting_energy)
 
-        return self.spikes[self._energy_sorted_idxs[spike_idx]]
+        return self.spikes[self._energy_sorted_idxs]
+
+    def get_energy_sorted_idxs(self):
+        """ Return energy sorted indices
+
+        This method requires that the energies have been initialized already
+        """
+        try:
+            self._energy_sorted_idxs
+        except AttributeError:
+            self._energy_sorted_idxs = np.argsort(self._fitting_energy)
+
+        return self._energy_sorted_idxs
 
 
 class Template:
