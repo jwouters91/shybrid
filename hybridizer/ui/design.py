@@ -193,7 +193,7 @@ class Ui_Pybridizer(object):
 
     def retranslateUi(self, Pybridizer):
         _translate = QtCore.QCoreApplication.translate
-        Pybridizer.setWindowTitle(_translate("Pybridizer", "pybridizer"))
+        Pybridizer.setWindowTitle(_translate("Pybridizer", "SHY BRIDE: Spike HYBRIDizer for Extracellular recordings"))
         self.btnDataSelect.setText(_translate("Pybridizer", "select data"))
         self.listClusterSelect.setCurrentText(_translate("Pybridizer", "select cluster"))
         self.listClusterSelect.setItemText(0, _translate("Pybridizer", "select cluster"))
