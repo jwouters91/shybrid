@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
 from hybridizer.ui import design
-from hybridizer.io import Recording, Phy
+from hybridizer.io import Recording, SpikeClusters, Phy
 from hybridizer.spikes import SpikeTrain
 
 CHOOSE_CLUSTER = 'select cluster'
@@ -99,12 +99,24 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                     config = yaml.load(f)
 
                 data_conf = config['data']
+                data_clus = config['clusters']
 
                 # initialise program objects
                 self.recording = Recording(raw_fn, data_conf['probe'],
                                            data_conf['fs'], data_conf['dtype'],
                                            order=data_conf['order'])
-                self.phy = Phy(config['phy'])
+
+                for clus_mode in data_clus.keys():
+                    # load cluster information from phy
+                    if clus_mode == 'phy':
+                        phy = Phy(data_clus[clus_mode])
+                        self.clusters = SpikeClusters()
+                        self.clusters.fromPhy(phy)
+                    # load cluster information from csv
+                    elif clus_mode == 'csv':
+                        self.clusters = SpikeClusters()
+                        self.clusters.fromCSV(data_clus[clus_mode])
+
             else:
                 # throw message box if config file does not exist
                 QtWidgets.QMessageBox.critical(self, 'config file not found',
@@ -116,7 +128,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self.fill_cluster_dropdown()
 
             # keep track of moves and generated GT
-            self.generated_GT = {}
+            self.generated_GT = SpikeClusters()
 
             # clean up
             try:
@@ -127,8 +139,14 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
             self.btnExport.setEnabled(False)
 
+    def reset_GUI(self):
+        """ Reset GUI to initial state, to use e.g. when switching dataset
+        """
+        # TODO
+        pass
+
     def fill_cluster_dropdown(self):
-        good_clusters = self.phy.get_good_clusters()
+        good_clusters = self.clusters.keys().tolist()
         self.good_clusters = [CHOOSE_CLUSTER] + np.sort(good_clusters).astype('str').tolist()
         self.listClusterSelect.clear()
         self.listClusterSelect.addItems(self.good_clusters)
@@ -153,7 +171,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                     self.spike_times = self.generated_GT[self._current_cluster]
                 else:
                     # use external
-                    self.spike_times = self.phy.get_cluster_activation(self._current_cluster)
+                    self.spike_times = self.clusters[self._current_cluster]
                 self.spikeTrain = SpikeTrain(self.recording, self.spike_times)
 
                 # calculate template and show
@@ -687,9 +705,15 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                                                   directory=self._select_path,
                                                   filter='raw recording (*.raw *.bin)')
 
+        # generate GT path
+        csv_path, _ = os.path.splitext(export_path)
+        csv_path = '{}_GT.csv'.format(csv_path)
+
         self.disable_GUI()
         self.recording.save_raw(export_path)
+        self.generated_GT.dumpCSV(csv_path)
         self.enable_GUI()
+
 
 def main():
     app = QtWidgets.QApplication(sys.argv)

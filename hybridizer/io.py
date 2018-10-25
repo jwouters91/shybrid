@@ -108,6 +108,63 @@ class Recording:
         return self.data[self.probe.channels,start:end]
 
 
+class SpikeClusters:
+    """ Class modeling a collection of spike clusters
+    """
+    def __init__(self):
+        """ This class wraps a dictionary
+        """
+        self.__mem__ = {}
+
+    def __getitem__(self, arg):
+        return self.__mem__[arg]
+
+    def __setitem__(self, key, value):
+        self.__mem__[key] = value
+
+    def keys(self):
+        """ Return the keys ordered ascending
+        """
+        return np.sort(list(self.__mem__.keys()))
+
+    def fromCSV(self, fn, delimiter=','):
+        """ First column of CSV must contain integer cluster indices, second
+        column of CSV must contain integer spike times.
+        """
+        cluster_info = np.loadtxt(fn, delimiter=delimiter, dtype=np.int)
+
+        for cluster in set(cluster_info[:,0]):
+            cluster_mask = np.where(cluster_info[:,0] == cluster)[0]
+
+            cluster_spike_times = cluster_info[cluster_mask,1]
+            cluster_spike_times.sort()
+
+            self[cluster] = cluster_spike_times
+
+    def dumpCSV(self, fn, delimiter=','):
+        """ Dump the spike clusters in a CSV-file
+        """
+        dump = np.empty((0,2))
+
+        # loop over different moved clusters
+        for idx, cluster in enumerate(self.keys()):
+            gt_tmp = self[cluster]
+            tmp_dump = np.ones((gt_tmp.size,2))
+
+            # renumber clusters for dump
+            tmp_dump[:,0] *= idx
+            tmp_dump[:,1] = gt_tmp
+            dump = np.concatenate((dump, tmp_dump), axis=0)
+
+        # dump
+        np.savetxt(fn, dump, delimiter=delimiter, fmt='%i')
+
+    def fromPhy(self, phy):
+        """ Load cluster information using a phy object
+        """
+        for cluster in phy.get_good_clusters():
+            self[cluster] = phy.get_cluster_activation(cluster)
+
 class Phy:
     """ Phy class that exposes spike sorting results and manual curation
     information
