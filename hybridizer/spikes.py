@@ -62,8 +62,9 @@ class SpikeTrain:
             self._template_fitting[idx] = temp_fit
             self._residual_fitting[idx] = res_fit
 
-            self._fitting_energy[idx] =\
-                np.sum(self.template.get_fitted_waveform(temp_fit, res_fit)**2)
+#            self._fitting_energy[idx] =\
+#                np.sum(self.template.get_fitted_waveform(temp_fit, res_fit)**2)
+            self._fitting_energy[idx] = temp_fit**2
 
             if fitOnly:
                 continue
@@ -257,10 +258,26 @@ class Template:
                     spike_train.recording.get_good_chunk(start,
                                                          end)
 
+        self.calculate_PC(spike_train, spike_train.spikes)
+
+    def calculate_PC(self, spike_train, selected_spikes):
+        """ Calculate principle component using only the given spikes
+        """
+        # build spike tensor
+        spike_tensor = np.empty((selected_spikes.size,
+                                 self.data.shape[0],
+                                 self.window_size))
+
+        for idx, spike in enumerate(selected_spikes):
+            start = int(spike - self.window_size/2)
+            end = int(start + self.window_size)
+            spike_tensor[idx] =\
+                spike_train.recording.get_good_chunk(start,
+                                                     end)
         # project snippets into space orthogonal to template
-        for spike_idx in range(spike_train.get_nb_spikes()):
-            fit = self._fit_template(spike_tensor[spike_idx])
-            spike_tensor[spike_idx] -= fit * self.data
+        for idx, spike in enumerate(selected_spikes):
+            fit = self._fit_template(spike_tensor[idx])
+            spike_tensor[idx] -= fit * self.data
 
         # calculate first PC for fitting
         spike_matrix = spike_tensor.reshape((spike_tensor.shape[0],
