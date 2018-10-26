@@ -187,7 +187,7 @@ class Template:
         function.
     """
 
-    def __init__(self, spike_train, window_size, realign=False):
+    def __init__(self, spike_train, window_size, realign=False, force_zero=True):
         self.window_size = window_size
 
         # build spike tensor
@@ -203,6 +203,12 @@ class Template:
                                                      end)
 
         self.data = np.median(spike_tensor, axis=0)
+
+        # set every channel to zero that has less than 1% of max channel energy
+        if force_zero:
+            energy = self.data**2
+            energy = np.sum(energy, axis=1)
+            self.data[energy<0.01*energy.max(),:] = 0
 
         if realign:
             offsets = np.zeros(spike_train.get_nb_spikes())

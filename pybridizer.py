@@ -26,6 +26,8 @@ TEMPLATE_COLOR = '#1F77B4'
 SPIKE_COLOR = 'salmon'
 MOVE_COLOR = '#1F77B4'
 ENERGY_COLOR = 'salmon'
+INACTIVE_COLOR = 'gray'
+FLAT_COLOR = 'lightgray'
 
 
 class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
@@ -401,8 +403,10 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             signal = data[idx] * scaling
             signal += y_start
 
-            self.axes.plot(time, signal, color)
-
+            if not signal.min() == signal.max():
+                self.axes.plot(time, signal, color)
+            else: # if all zeros / flat channel
+                self.axes.plot(time, signal, FLAT_COLOR)
         # draw
         self.axes.figure.canvas.draw()
 
@@ -446,11 +450,11 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             if self._energy_LB is not None:
                 self.axes.plot(x[:(self._energy_LB+1)],
                                energy[:(self._energy_LB+1)],
-                               'gray', zorder=1)
+                               INACTIVE_COLOR, zorder=1)
                 self.fill_LB = self.axes.fill_between(x[:(self._energy_LB+1)],
                                                       energy[:(self._energy_LB+1)],
                                                       bottom[:(self._energy_LB+1)],
-                                                      color='gray')
+                                                      color=INACTIVE_COLOR)
         except AttributeError:
             pass
 
@@ -458,11 +462,11 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             if self._energy_UB is not None:
                 UB_idx = self._energy_UB - energy.size
     
-                self.axes.plot(x[UB_idx:], energy[UB_idx:], 'gray', zorder=1)
+                self.axes.plot(x[UB_idx:], energy[UB_idx:], INACTIVE_COLOR, zorder=1)
                 self.fill_UB = self.axes.fill_between(x[UB_idx:],
                                                       energy[UB_idx:],
                                                       bottom[UB_idx:],
-                                                      color='gray')
+                                                      color=INACTIVE_COLOR)
         except AttributeError:
             pass
 
