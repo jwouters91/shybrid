@@ -10,11 +10,12 @@ import sys
 import os
 
 import yaml
-from PyQt5 import QtWidgets
+from PyQt5 import QtWidgets, QtGui
 import numpy as np
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
 from hybridizer.ui import design
 from hybridizer.io import Recording, SpikeClusters, Phy
@@ -57,11 +58,15 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.btnMove.clicked.connect(self.execute_move)
         self.btnExport.clicked.connect(self.export_data)
 
+        self.btnResetZoom.clicked.connect(self.reset_view_plot)
+        self.btnZoom.clicked.connect(self.zoom_plot)
+        self.btnPan.clicked.connect(self.pan_plot)
+
         #set up plotting area
         canvas = FigureCanvas(plt.figure())
-        #canvas.figure.patch.set_facecolor(self.palette().color(10).getRgbF())
-        #pickcid needed later to disconnect and reconnect when selecting for removal
-        #self.__pickcid = canvas.mpl_connect('pick_event',self.pickHandler)
+        self.toolbar = NavigationToolbar(canvas, self)
+        self.toolbar.hide()
+
         self.axes = canvas.figure.add_subplot(111)
         self.axes.spines['top'].set_visible(False)
         self.axes.spines['right'].set_visible(False)
@@ -190,6 +195,10 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self._template_scaling = self.plot_multichannel(self.spikeTrain.template.data)
             self.axes.autoscale(False)
 
+            # clear removes callbacks
+            self.axes.callbacks.connect('ylim_changed', self.lim_changed)
+            self.axes.callbacks.connect('xlim_changed', self.lim_changed)
+
             # enable options for further use
             self.radioTemplate.setChecked(True)
             self.radioTemplate.setEnabled(True)
@@ -225,6 +234,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.horizontalSlider.valueChanged.disconnect()
         self.horizontalSlider.setValue(0)
         self.horizontalSlider.valueChanged.connect(self.slide_spike)
+
+        self.template_fit_active = enabled
 
         if self._current_cluster in self.generated_GT.keys():
             self.checkBoxLower.setEnabled(False)
@@ -713,6 +724,22 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.recording.save_raw(export_path)
         self.generated_GT.dumpCSV(csv_path)
         self.enable_GUI()
+
+    # interactive graph helpers
+    def reset_view_plot(self):
+        self.toolbar.home()
+
+    def zoom_plot(self):
+        self.toolbar.zoom()
+
+    def pan_plot(self):
+        self.toolbar.pan()
+
+    # callback keeping clean energy bar on interaction
+    def lim_changed(self, ax):
+        # make sure energy bar is alway nice and clean
+        if self.template_fit_active:
+            self.render_current_spike()
 
 
 def main():
