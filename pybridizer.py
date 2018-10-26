@@ -543,6 +543,10 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.GUI_status['checkBoxLower'] = self.checkBoxLower.isEnabled()
         self.GUI_status['checkBoxUpper'] = self.checkBoxUpper.isEnabled()
         self.GUI_status['btnMove'] = self.btnMove.isEnabled()
+        self.GUI_status['btnResetZoom'] = self.btnResetZoom.isEnabled()
+        self.GUI_status['btnZoom'] = self.btnZoom.isEnabled()
+        self.GUI_status['btnPan'] = self.btnPan.isEnabled()
+
 
     def disable_GUI(self):
         if self.GUI_enabled:
@@ -572,6 +576,9 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self.checkBoxLower.setEnabled(False)
             self.checkBoxUpper.setEnabled(False)
             self.btnMove.setEnabled(False)
+            self.btnResetZoom.setEnabled(False)
+            self.btnZoom.setEnabled(False)
+            self.btnPan.setEnabled(False)
 
             # force redraw
             self.repaint()
@@ -593,6 +600,9 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.btnReset.setEnabled(self.GUI_status['btnReset'])
         self.btnExport.setEnabled(self.GUI_status['btnExport'])
         self.horizontalSlider.setEnabled(self.GUI_status['horizontalSlider'])
+        self.btnResetZoom.setEnabled(self.GUI_status['btnResetZoom'])
+        self.btnZoom.setEnabled(self.GUI_status['btnZoom'])
+        self.btnPan.setEnabled(self.GUI_status['btnPan'])
 
         self.GUI_enabled = True
 
@@ -720,14 +730,15 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                                                   directory=self._select_path,
                                                   filter='raw recording (*.raw *.bin)')
 
-        # generate GT path
-        csv_path, _ = os.path.splitext(export_path)
-        csv_path = '{}_GT.csv'.format(csv_path)
+        if export_path != '':
+            # generate GT path
+            csv_path, _ = os.path.splitext(export_path)
+            csv_path = '{}_GT.csv'.format(csv_path)
 
-        self.disable_GUI()
-        self.recording.save_raw(export_path)
-        self.generated_GT.dumpCSV(csv_path)
-        self.enable_GUI()
+            self.disable_GUI()
+            self.recording.save_raw(export_path)
+            self.generated_GT.dumpCSV(csv_path)
+            self.enable_GUI()
 
     # interactive graph helpers
     def reset_view_plot(self):
