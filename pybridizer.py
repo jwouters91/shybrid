@@ -64,6 +64,9 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.btnZoom.clicked.connect(self.zoom_plot)
         self.btnPan.clicked.connect(self.pan_plot)
 
+        self.btnZoom.setCheckable(True)
+        self.btnPan.setCheckable(True)
+
         #set up plotting area
         canvas = FigureCanvas(plt.figure())
         self.toolbar = NavigationToolbar(canvas, self)
@@ -747,8 +750,16 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
     def zoom_plot(self):
         self.toolbar.zoom()
 
+        # bring up pan button if necessary
+        if self.btnPan.isChecked():
+            self.btnPan.setChecked(False)
+
     def pan_plot(self):
         self.toolbar.pan()
+
+        # bring up zoom button if necessary
+        if self.btnZoom.isChecked():
+            self.btnZoom.setChecked(False)
 
     # callback keeping clean energy bar on interaction
     def lim_changed(self, ax):
