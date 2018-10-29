@@ -7,5 +7,6 @@ setup(name='hybridizer',
       description='Hybrid Data Generator',
       author='Jasper Wouters',
       author_email='jasper.wouters@esat.kuleuven.be',
-      packages=['hybridizer'],
+      packages=['hybridizer', 'hybridizer.ui'],
+      scripts=['shybride.py'],
      )

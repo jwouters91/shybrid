@@ -1,5 +1,5 @@
 numpy
 scipy
-PyQt
-PyYAML
+pyqt
+pyyaml
 matplotlib
