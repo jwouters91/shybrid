@@ -9,8 +9,6 @@ Created on Wed Sep 12 13:52:29 2018
 import numpy as np
 import scipy.sparse.linalg as la
 
-import matplotlib.pyplot as plt
-
 class SpikeTrain:
     """ Spike train class grouping spikes and recording
 
@@ -25,6 +23,9 @@ class SpikeTrain:
         self.spikes = spike_times
         self.permutation= None
 
+        # init this cache, sorting only once on first request
+        self._energy_sorted_idxs = None
+
     def calculate_template(self, window_size=100, realign=False):
         """ Calculate a template for this spike train for the given discrete
         window size
@@ -36,51 +37,43 @@ class SpikeTrain:
         """
         return self.spikes.size
 
-    #TODO make a separate function to fit
-    def subtract_train(self, plot=False, fitOnly=False):
-        """ Subtract spike train from the recording.
+    def fit_spikes(self, use_PC=False):
+        """ Calculate spike fits
         """
-        # keep track of the fitting factor for later insertion
         self._template_fitting = np.zeros(self.spikes.shape)
-        self._residual_fitting = np.zeros(self.spikes.shape)
+        if use_PC: self._residual_fitting = np.zeros(self.spikes.shape)
         self._fitting_energy = np.zeros(self.spikes.shape)
-
-        channels = self.recording.probe.channels
-
-        if plot:
-            spacing = 0.1*np.arange(channels.size)[:,np.newaxis]
-            plot_set = np.random.permutation(self.get_nb_spikes())
-            plot_set = plot_set[:10]
 
         for idx, spike in enumerate(self.spikes):
             start, end = self.get_spike_start_end(spike)
             chunk = self.recording.get_good_chunk(start, end)
 
             # fit template to spike
-            temp_fit, res_fit = self.template.fit(chunk)
+            if use_PC:
+                temp_fit, res_fit = self.template.fit(chunk)
+                self._residual_fitting[idx] = res_fit
+            else:
+                temp_fit = self.template._fit_template(chunk)
 
             self._template_fitting[idx] = temp_fit
-            self._residual_fitting[idx] = res_fit
 
-#            self._fitting_energy[idx] =\
-#                np.sum(self.template.get_fitted_waveform(temp_fit, res_fit)**2)
+            # fitting energy only based on template
             self._fitting_energy[idx] = temp_fit**2
 
-            if fitOnly:
-                continue
+    def subtract_train(self, use_PC=False):
+        """ Subtract spike train from the recording.
+        """
+        channels = self.recording.probe.channels
+        for idx, spike in enumerate(self.spikes):
+            start, end = self.get_spike_start_end(spike)
 
-            fitted_waveform = self.template.get_fitted_waveform(temp_fit,
-                                                                res_fit)
-
-            fitted_waveform_wo = self.template.get_fitted_waveform(temp_fit,
-                                                                   0)
-
-            # make some plots showing the actual fit
-            if plot and idx in plot_set:
-                plt.figure()
-                plt.plot((chunk+spacing).T, 'b')
-                plt.plot((fitted_waveform+spacing).T, 'g')
-                plt.plot((fitted_waveform_wo+spacing).T, 'r')
+            temp_fit = self._template_fitting[idx]
+            if use_PC:
+                res_fit = self._residual_fitting[idx]
+                fitted_waveform = self.template.get_fitted_waveform(temp_fit,
+                                                                    res_fit)
+            else:
+                fitted_waveform = self.template.get_fitted_waveform(temp_fit)
 
             # subtract
             self.recording.data[channels, start:end] = \
@@ -117,17 +110,49 @@ class SpikeTrain:
             self.recording.data[channels, start:end] = \
                  self.recording.data[channels, start:end] + insert_waveform
 
+    def insert_given_train(self, spike_times, template, template_fitting,
+                           residual=None, residual_fitting=None):
+        """ Insert given spike train
+
+        Returns:
+            inserted_spikes (ndarray): spike that were actually inserted
+        """
+        channels = self.recording.probe.channels
+
+        inserted_spikes = np.array([])
+        for idx, spike_t in enumerate(spike_times):
+            temp_fit = template_fitting[idx]
+            if residual is not None: res_fit = residual_fitting[idx]
+
+            insert_spike = temp_fit * template
+
+            if residual is not None:
+                insert_spike += res_fit * residual_fitting 
+
+            start, end = self.get_spike_start_end(spike_t)
+
+            if end > self.recording.get_duration():
+                continue
+
+            self.recording.data[channels, start:end] = \
+                 self.recording.data[channels, start:end] + insert_spike
+
+            inserted_spikes = np.append(inserted_spikes, spike_t)
+
+        inserted_spikes.sort()
+        return inserted_spikes
+
     def update(self, spike_times):
         """ Update spike times and trigger resets
         """
         self.spikes = spike_times
 
-        del self._template_fitting
-        del self._residual_fitting
-        del self._fitting_energy
-        del self._energy_sorted_idxs
+        self._template_fitting = None
+        self._residual_fitting = None
+        self._fitting_energy = None
+        self._energy_sorted_idxs = None
 
-        self.calculate_template(self.template.window_size)
+        self.calculate_template(window_size=self.template.window_size)
 
     def get_spike_start_end(self, spike):
         """ Get start and end for the given spike
@@ -155,9 +180,7 @@ class SpikeTrain:
 
         This method requires that the energies have been initialized already
         """
-        try:
-            self._energy_sorted_idxs
-        except AttributeError:
+        if self._energy_sorted_idxs is None:
             self._energy_sorted_idxs = np.argsort(self._fitting_energy)
 
         return self.spikes[self._energy_sorted_idxs]
@@ -167,9 +190,7 @@ class SpikeTrain:
 
         This method requires that the energies have been initialized already
         """
-        try:
-            self._energy_sorted_idxs
-        except AttributeError:
+        if self._energy_sorted_idxs is None:
             self._energy_sorted_idxs = np.argsort(self._fitting_energy)
 
         return self._energy_sorted_idxs
@@ -188,7 +209,8 @@ class Template:
         function.
     """
 
-    def __init__(self, spike_train, window_size, realign=False, force_zero=True):
+    def __init__(self, spike_train, window_size, realign=False,
+                 force_zero=True, calculate_PC=False):
         self.window_size = window_size
 
         # build spike tensor
@@ -258,7 +280,8 @@ class Template:
                     spike_train.recording.get_good_chunk(start,
                                                          end)
 
-        self.calculate_PC(spike_train, spike_train.spikes)
+        if calculate_PC:
+            self.calculate_PC(spike_train, spike_train.spikes)
 
     def calculate_PC(self, spike_train, selected_spikes):
         """ Calculate principle component using only the given spikes
@@ -290,6 +313,50 @@ class Template:
         self.PC = PCs[:,0].reshape((spike_tensor.shape[1],
                                     spike_tensor.shape[2]))
         self.PC = np.real(self.PC)
+
+    def calculate_shifted_template(self, spike_train, x_shift, y_shift,
+                                   shifted_PC=False):
+        """ Calculate shifted template
+        """
+        shifted_template = np.zeros(spike_train.template.data.shape)
+        if shifted_PC: shifted_PC = np.zeros(spike_train.template.PC.shape)
+
+        # TODO extract from data
+        x_between = 1
+        y_between = 1
+
+        for idx, channel in enumerate(spike_train.recording.probe.channels):
+            geo = spike_train.recording.probe.geometry[channel]
+
+            # find location that projects on this channel (that's why minus)
+            geo_x = geo[0] - x_shift * x_between
+            geo_y = geo[1] - y_shift * y_between
+
+            interpolated_waveform = np.zeros(spike_train.template.data[0].shape)
+            if shifted_PC: interpolated_PC = np.zeros(spike_train.template.PC[0].shape)
+
+            interpolation_count = 0
+            interpolation_needed = True
+            for jdx, project_channel in enumerate(spike_train.recording.probe.channels):
+                project_geo = spike_train.recording.probe.geometry[project_channel]
+
+                if geo_x == project_geo[0] and geo_y == project_geo[1]:
+                    shifted_template[idx] = spike_train.template.data[jdx]
+                    if shifted_PC: shifted_PC[idx] = spike_train.template.PC[jdx]
+                    interpolation_needed = False
+                else:
+                    if abs(geo_x - project_geo[0]) <= x_between and abs(geo_y - project_geo[1]) <= y_between:
+                        interpolated_waveform += spike_train.template.data[jdx]
+                        if shifted_PC: interpolated_PC += spike_train.template.PC[jdx]
+                        interpolation_count += 1
+
+            if interpolation_needed and interpolation_count > 0:
+                shifted_template[idx] = interpolated_waveform / interpolation_count
+                if shifted_PC: shifted_PC[idx] = interpolated_PC / interpolation_count
+
+        # set those shifted waveforms as class variables for reuse
+        self.shifted_template = shifted_template
+        if shifted_PC: self.shifted_PC = shifted_PC
 
     def _fit_template(self, chunk):
         """ Fit the given chunk to the template
@@ -328,7 +395,10 @@ class Template:
 
         return template_fit, residual_fit
 
-    def get_fitted_waveform(self, template_fit, residual_fit):
+    def get_fitted_waveform(self, template_fit, residual_fit=None):
         """ Return fitted waveform
         """
-        return template_fit * self.data + residual_fit * self.PC
+        if residual_fit is None:
+            return template_fit * self.data
+        else:
+            return template_fit * self.data + residual_fit * self.PC
