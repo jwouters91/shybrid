@@ -94,7 +94,7 @@ class Recording:
     def save_raw(self, full_fn):
         """  Save the data in raw format in the original data folder
         """
-        self.data.T.tofile(full_fn)
+        self.data.tofile(full_fn)
 
     def save_npy(self):
         """ Save the data in npy format in the original data folder
