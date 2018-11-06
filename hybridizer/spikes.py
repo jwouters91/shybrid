@@ -321,9 +321,8 @@ class Template:
         shifted_template = np.zeros(spike_train.template.data.shape)
         if shifted_PC: shifted_PC = np.zeros(spike_train.template.PC.shape)
 
-        # TODO extract from data
-        x_between = 1
-        y_between = 1
+        x_between = spike_train.recording.probe.x_between
+        y_between = spike_train.recording.probe.y_between
 
         for idx, channel in enumerate(spike_train.recording.probe.channels):
             geo = spike_train.recording.probe.geometry[channel]

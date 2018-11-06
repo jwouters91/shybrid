@@ -267,6 +267,10 @@ class Probe:
         # extract geometry
         self.geometry = variables['channel_groups'][1]['geometry']
 
+        # assuming rectangular probes with equal x spacing and equal y spacing
+        self.x_between = self.get_x_between()
+        self.y_between = self.get_y_between()
+
     def get_min_geometry(self):
         """ Return the minimum geometry value for each dimension in a single
         ndarray
@@ -278,3 +282,47 @@ class Probe:
         ndarray
         """
         return np.array(list(self.geometry.values())).max(axis=0)
+
+    def get_x_between(self):
+        """ Return the electrode pitch in the x direction
+        """
+        X = 0
+
+        x_locs = np.array(list(self.geometry.values()))[:,X]
+
+        # init at the maximum possible difference (possibly zero)
+        x_between = self.get_max_geometry()[X] - self.get_min_geometry()[X]
+
+        # choose x between as the shortest non-zero difference
+        for x_tmp_1 in x_locs:
+            for x_tmp_2 in x_locs:
+                x_diff = abs(x_tmp_1 - x_tmp_2)
+                if x_diff > 0 and x_diff < x_between:
+                    x_between = x_diff
+
+        if x_between == 0:
+            x_between = 1
+
+        return x_between
+
+    def get_y_between(self):
+        """ Return the electrode pitch in the y direction
+        """
+        Y = 1
+
+        y_locs = np.array(list(self.geometry.values()))[:,Y]
+
+        # init at the maximum possible difference (possibly zero)
+        y_between = self.get_max_geometry()[Y] - self.get_min_geometry()[Y]
+
+        # choose x between as the shortest non-zero difference
+        for y_tmp_1 in y_locs:
+            for y_tmp_2 in y_locs:
+                y_diff = abs(y_tmp_1 - y_tmp_2)
+                if y_diff > 0 and y_diff < y_between:
+                    y_between = y_diff
+
+        if y_between == 0:
+            y_between = 1
+
+        return y_between

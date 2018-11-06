@@ -524,9 +524,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         x_range = max_geo[0] - min_geo[0]
         y_range = max_geo[1] - min_geo[1]
 
-        # TODO extract from data
-        x_between = 1
-        y_between = 1
+        x_between = self.recording.probe.x_between
+        y_between = self.recording.probe.y_between
 
         # data info
         min_dat = data.min()
