@@ -15,3 +15,6 @@ Or use requirements_strict to enforce the exact package versions used for testin
 We kept the extension on the executable, such that it can also be executed from a windows command line (no shebang support on windows). Keep in mind that the program is only accessible from within the shybride conda environment (i.e., reactivate the environment after ,e.g., a reboot).
 
 ## Generating hybrid data using SHY BRIDE
+
+### exporting data
+The exported binary is vectorized using the C-style formatting (row-major), this independent of the format of the original data.
