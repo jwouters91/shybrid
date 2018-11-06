@@ -124,7 +124,7 @@ config['clusters']['csv'] = clusters_full_fn
 
 config_fn, _ = os.path.splitext(data_fn)
 config_full_fn = os.path.join(directory, config_fn)
-config_full_fn += '.yaml'
+config_full_fn += '.yml'
 
 with open(config_full_fn, 'w') as outfile:
     yaml.dump(config, outfile, default_flow_style=False)

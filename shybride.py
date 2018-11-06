@@ -109,7 +109,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
             # parse config file
             config_fn, _ = os.path.splitext(raw_fn)
-            config_fn = config_fn + '.yaml'
+            config_fn = config_fn + '.yml'
 
             # assuming that params file is correct (TODO add explicit checks)
             if os.path.isfile(config_fn):
