@@ -127,7 +127,7 @@ config_full_fn = os.path.join(directory, config_fn)
 config_full_fn += '.yaml'
 
 with open(config_full_fn, 'w') as outfile:
-    yaml.dump(config, outfile)
+    yaml.dump(config, outfile, default_flow_style=False)
 
 print('# Following files have been generated:\n- {}\n- {}\n- {}\n- {}'.\
           format(data_full_fn, clusters_full_fn,
