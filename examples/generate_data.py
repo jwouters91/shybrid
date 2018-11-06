@@ -6,7 +6,7 @@ Created on Mon Nov  5 09:42:38 2018
 @author: jwouters
 
 Running this script generates toy example testing data that can be used with
-the supplied graphical user interface. This script should be ran from within
+the supplied graphical user interface. This script should be run from within
 the examples folder.
 
 """
