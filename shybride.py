@@ -10,7 +10,7 @@ import sys
 import os
 
 import yaml
-from PyQt5 import QtWidgets
+from PyQt5 import QtWidgets, QtCore
 import numpy as np
 
 import matplotlib.cm as cm
@@ -252,7 +252,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self.radioFit.setEnabled(True)
 
             if self._current_cluster in self.generated_GT.keys():
-                self.radioMove.setEnabled(False)
+                # self.radioMove.setEnabled(False)
+                self.radioMove.setEnabled(True) # we opted for eternal program flow
                 self.plotTitle.setText('Cluster {} [ALREADY MOVED]'.format(self._current_cluster))
             else:
                 self.radioMove.setEnabled(True)
@@ -545,9 +546,9 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.radioTemplate.setChecked(True)
         self.draw_template(calcTemp=False)
 
-        # diable choice in cluster list
+        # repaint choice in cluster list
         idx = np.where(np.array(self.good_clusters) == str(int(self._current_cluster)))[0][0]
-        self.listClusterSelect.model().item(idx).setEnabled(False)
+        self.listClusterSelect.model().item(idx).setForeground(QtCore.Qt.gray)
 
 
     """
