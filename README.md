@@ -5,7 +5,7 @@
 1. Install miniconda (Python 3.x version) for your operaring system. Please follow the official conda.io [instructions](https://conda.io/docs/user-guide/install/index.html#regular-installation).
 2. Clone this GIT project on your local machine:
 ``` 
-git clone https://gitlab.esat.kuleuven.be/Jasper.Wouters/Hybridizer.git
+git clone https://gitlab.esat.kuleuven.be/Jasper.Wouters/shy.bride.git
 ```
 3. Create a conda environment for SHY BRIDE:
 ```
