@@ -107,6 +107,24 @@ class Recording:
         """
         return self.data[self.probe.channels,start:end]
 
+    def count_spikes(self, C=5):
+        """ Count the number of spikes on every channel
+        """
+        # calculate a simple spike threshold based on the standard deviation
+        channel_thresholds = np.std(self.data[self.probe.channels], axis=1) * C
+
+        # detect negative peaks in the signal, resulting in a binary signal          
+        detections = self.data[self.probe.channels] < (-1 * channel_thresholds[:,np.newaxis])
+        detections = detections.astype(np.int8)
+
+        # extract the number of threshold crossings (per channel)
+        # by detecting rising edges
+        detections = np.diff(detections)
+        detections = np.count_nonzero(detections, axis=1)
+        detections = detections / 2 # divide by two because both the rising and falling edge are counted otherwise
+
+        return detections
+
 
 class SpikeClusters:
     """ Class modeling a collection of spike clusters

@@ -13,6 +13,8 @@ import yaml
 from PyQt5 import QtWidgets
 import numpy as np
 
+import matplotlib.cm as cm
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -29,6 +31,7 @@ ENERGY_COLOR = 'salmon'
 INACTIVE_COLOR = 'gray'
 FLAT_COLOR = 'lightgray'
 MARKER_COLOR = 'darkslategray'
+COLOR_MAP = 'rainbow'
 
 class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
     def __init__(self, parent=None):
@@ -59,6 +62,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.checkBoxUpper.clicked.connect(lambda: self.set_energy_ub(draw=True))
         self.btnMove.clicked.connect(self.execute_move)
         self.btnExport.clicked.connect(self.export_data)
+        self.checkHeatMap.clicked.connect(self.toggle_heat_map)
 
         self.btnResetZoom.clicked.connect(self.reset_view_plot)
         self.btnZoom.clicked.connect(self.zoom_plot)
@@ -67,7 +71,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.btnZoom.setCheckable(True)
         self.btnPan.setCheckable(True)
 
-        #set up plotting area
+        """ set up main plotting area
+        """
         canvas = FigureCanvas(plt.figure())
         self.toolbar = NavigationToolbar(canvas, self)
         self.toolbar.hide()
@@ -89,6 +94,27 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         # add canvas widget to GUI
         self.plotCanvas.addWidget(canvas)
 
+        """ set up color bar plotting area
+        """
+        canvas_color = FigureCanvas(plt.figure(figsize=(0,0.2)))
+
+        self.axes_color = canvas_color.figure.add_subplot(111)
+        self.axes_color.spines['top'].set_visible(False)
+        self.axes_color.spines['right'].set_visible(False)
+        self.axes_color.spines['bottom'].set_visible(False)
+        self.axes_color.spines['left'].set_visible(False)
+        self.axes_color.yaxis.set_ticks([])
+        self.axes_color.xaxis.set_ticks([])
+        canvas_color.figure.subplots_adjust(0,0,1,1,0,0)
+
+        sizePolicyColor = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum,
+                                                QtWidgets.QSizePolicy.Fixed)
+        canvas_color.setSizePolicy(sizePolicyColor)
+
+        # add canvas widget to GUI
+        bg_color = self.palette().color(10).getRgbF()
+        self.axes_color.set_facecolor(bg_color)
+        self.colorBar.addWidget(canvas_color)
 
     """
     Methods related to data loading and cluster selection
@@ -401,9 +427,13 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.btnMoveUp.setEnabled(enabled)
         self.btnMoveRight.setEnabled(enabled)
         self.btnMoveDown.setEnabled(enabled)
+        self.checkHeatMap.setEnabled(enabled)
 
         self.btnMove.setEnabled(False)
         self.btnReset.setEnabled(False)
+
+        if not enabled:
+            self.show_color_bar(False)
 
     def render_shifted_template(self):
         """ Calculate and render the shifted template
@@ -413,9 +443,48 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.spikeTrain.template.calculate_shifted_template(self.spikeTrain,
                                                             self.x_shift,
                                                             self.y_shift)
-        self.plot_multichannel(self.spikeTrain.template.shifted_template,
-                               color=MOVE_COLOR,
-                               scaling=self._template_scaling)
+
+        if self.activations is None:
+            self.disable_GUI()
+            self.activations = self.recording.count_spikes(C=6).astype(np.float)
+            self.enable_GUI()
+
+        if self.checkHeatMap.isChecked():
+            norm_activations = self.activations / self.activations.max()
+            self.plot_multichannel(self.spikeTrain.template.shifted_template,
+                                   scaling=self._template_scaling,
+                                   activations=norm_activations)
+        else:
+            self.plot_multichannel(self.spikeTrain.template.shifted_template,
+                                   color=MOVE_COLOR,
+                                   scaling=self._template_scaling)
+
+        self.show_color_bar(self.checkHeatMap.isChecked())
+
+    def toggle_heat_map(self):
+        """ Toggle spike count heatmap in move template view
+        """
+        self.render_shifted_template()
+
+    def show_color_bar(self, show):
+        """ Show colorbar if show == True, else hide
+        """
+        if show:
+            self.labelLow.setText('0')
+            self.labelHigh.setText('{}'.format(int(self.activations.max())))
+
+            cmap = cm.get_cmap(COLOR_MAP)
+            mpl.colorbar.ColorbarBase(self.axes_color, cmap=cmap,
+                                      orientation='horizontal')
+            self.axes_color.figure.canvas.draw()
+        else:
+            self.labelLow.setText('')
+            self.labelHigh.setText('')
+
+            self.axes_color.clear()
+            bg_color = self.palette().color(10).getRgbF()
+            self.axes_color.figure.patch.set_facecolor(bg_color)
+            self.axes_color.figure.canvas.draw()
 
     def execute_move(self):
         """ Move shifted template in the data
@@ -511,7 +580,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
     Methods related to plotting on the GUI canvas
     """
 
-    def plot_multichannel(self, data, color=TEMPLATE_COLOR, scaling=None):
+    def plot_multichannel(self, data, color=TEMPLATE_COLOR, scaling=None,
+                          activations=None):
         """ Plot multichannel data on the figure canvas
         """
         min_geo = self.recording.probe.get_min_geometry()
@@ -552,10 +622,21 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             signal = data[idx] * scaling
             signal += y_start
 
+            # if activations are available use them to pick the color
+            if activations is not None:
+                activation = activations[idx]
+                cmap = cm.get_cmap(COLOR_MAP)
+                tmp_color = cmap(activation)
+            else:
+                tmp_color = color
+
             if not signal.min() == signal.max():
-                self.axes.plot(time, signal, color)
+                self.axes.plot(time, signal, color=tmp_color)
             else: # if all zeros / flat channel
-                self.axes.plot(time, signal, FLAT_COLOR)
+                if activations is None:
+                    tmp_color = FLAT_COLOR
+                self.axes.plot(time, signal, color=tmp_color)
+
         # draw
         self.axes.figure.canvas.draw()
 
@@ -724,6 +805,9 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.checkBoxUpper.setChecked(False)
         self.set_energy_ub(draw=False)
 
+        # reset other cluster related variables
+        self.activations = None
+
     def build_GUI_status_dict(self):
         """ Build GUI status dictionary to keep track of the GUI state
         """
@@ -753,6 +837,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.GUI_status['btnResetZoom'] = self.btnResetZoom.isEnabled()
         self.GUI_status['btnZoom'] = self.btnZoom.isEnabled()
         self.GUI_status['btnPan'] = self.btnPan.isEnabled()
+        self.GUI_status['checkHeatMap'] = self.checkHeatMap.isEnabled()
 
     def disable_GUI(self):
         """ Disable GUI
@@ -787,6 +872,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self.btnResetZoom.setEnabled(False)
             self.btnZoom.setEnabled(False)
             self.btnPan.setEnabled(False)
+            self.checkHeatMap.setEnabled(False)
 
             # force repainting of entire GUI
             self.repaint()
@@ -813,6 +899,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.btnResetZoom.setEnabled(self.GUI_status['btnResetZoom'])
         self.btnZoom.setEnabled(self.GUI_status['btnZoom'])
         self.btnPan.setEnabled(self.GUI_status['btnPan'])
+        self.checkHeatMap.setEnabled(self.GUI_status['checkHeatMap'])
 
         self.GUI_enabled = True
 
@@ -828,4 +915,6 @@ def main():
 
 
 if __name__ == '__main__':
+    """ Run main program
+    """
     main()
