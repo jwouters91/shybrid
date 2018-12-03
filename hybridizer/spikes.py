@@ -221,6 +221,11 @@ class Template:
         for spike_idx in range(spike_train.get_nb_spikes()):
             start = int(spike_train.spikes[spike_idx] - window_size/2)
             end = int(start + self.window_size)
+
+            # boundary checks
+            if (start < 0) or (end > spike_train.recording.data.shape[1]):
+                continue
+
             spike_tensor[spike_idx] =\
                 spike_train.recording.get_good_chunk(start,
                                                      end)
@@ -276,9 +281,17 @@ class Template:
             for spike_idx in range(spike_train.get_nb_spikes()):
                 start = int(spike_train.spikes[spike_idx] - window_size/2)
                 end = int(start + self.window_size)
+
+                # boundary checks
+                if (start < 0) or (end > spike_train.recording.data.shape[1]):
+                    continue
+
                 spike_tensor[spike_idx] =\
                     spike_train.recording.get_good_chunk(start,
                                                          end)
+
+            # recalculate template after realignment
+            self.data = np.median(spike_tensor, axis=0)
 
         if calculate_PC:
             self.calculate_PC(spike_train, spike_train.spikes)
@@ -363,9 +376,13 @@ class Template:
         template_flat = self.data.flatten()
         chunk_flat = chunk.flatten()
 
-        # calculate fit according to yger et al. 2018
-        fit = np.dot(chunk_flat, template_flat)
-        fit /= np.linalg.norm(template_flat)**2
+        # boundary cases set to zero (i.e., they don't get subtracted)
+        if template_flat.size != chunk_flat.size:
+            fit = 0
+        else:
+            # calculate fit according to yger et al. 2018
+            fit = np.dot(chunk_flat, template_flat)
+            fit /= np.linalg.norm(template_flat)**2
 
         return fit
 
@@ -375,9 +392,13 @@ class Template:
         PC_flat = self.PC.flatten()
         chunk_flat = residual_chunk.flatten()
 
-        # calculate fit according to yger et al. 2018
-        fit = np.dot(chunk_flat, PC_flat)
-        fit /= np.linalg.norm(PC_flat)**2
+        # boundary cases set to zero (i.e., they don't get subtracted)
+        if PC_flat.size != chunk_flat.size:
+            fit = 0
+        else:
+            # calculate fit according to yger et al. 2018
+            fit = np.dot(chunk_flat, PC_flat)
+            fit /= np.linalg.norm(PC_flat)**2
 
         return fit
 
