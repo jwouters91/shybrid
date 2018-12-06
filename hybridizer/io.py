@@ -107,14 +107,20 @@ class Recording:
         """
         return self.data[self.probe.channels,start:end]
 
-    def count_spikes(self, C=5):
+    def count_spikes(self, C=5, dur=30):
         """ Count the number of spikes on every channel
+
+        Args:
+          C (float) : Factor multiplied with channel standard deviation for
+          determining the spike detection threshold
+          dur (float) : Duration in seconds over which to calculate the
+          spike detection rate
         """
         # calculate a simple spike threshold based on the standard deviation
-        channel_thresholds = np.std(self.data[self.probe.channels], axis=1) * C
+        channel_thresholds = np.std(self.data[self.probe.channels, :int(dur*self.sampling_rate)], axis=1) * C
 
         # detect negative peaks in the signal, resulting in a binary signal          
-        detections = self.data[self.probe.channels] < (-1 * channel_thresholds[:,np.newaxis])
+        detections = self.data[self.probe.channels, :int(dur*self.sampling_rate)] < (-1 * channel_thresholds[:,np.newaxis])
         detections = detections.astype(np.int8)
 
         # extract the number of threshold crossings (per channel)
@@ -122,6 +128,9 @@ class Recording:
         detections = np.diff(detections)
         detections = np.count_nonzero(detections, axis=1)
         detections = detections / 2 # divide by two because both the rising and falling edge are counted otherwise
+
+        # convert to spike rates
+        detections = detections / dur
 
         return detections
 

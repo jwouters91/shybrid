@@ -785,6 +785,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
         self._current_spike = None
 
+        self.activations = None
+
     def reset_GUI_initial(self):
         """ Reset GUI to initial enabled state
         """
@@ -810,9 +812,6 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.set_energy_lb(draw=False)
         self.checkBoxUpper.setChecked(False)
         self.set_energy_ub(draw=False)
-
-        # reset other cluster related variables
-        self.activations = None
 
     def build_GUI_status_dict(self):
         """ Build GUI status dictionary to keep track of the GUI state

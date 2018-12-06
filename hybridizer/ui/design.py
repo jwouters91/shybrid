@@ -265,7 +265,7 @@ class Ui_Pybridizer(object):
         self.btnReset.setText(_translate("Pybridizer", "reset"))
         self.btnMoveDown.setText(_translate("Pybridizer", "↓"))
         self.btnMoveRight.setText(_translate("Pybridizer", "→"))
-        self.checkHeatMap.setText(_translate("Pybridizer", "show spiking activity (# spikes)"))
+        self.checkHeatMap.setText(_translate("Pybridizer", "show mean spike rate (Hz)"))
         self.btnMove.setText(_translate("Pybridizer", "execute move"))
         self.btnExport.setText(_translate("Pybridizer", "export data"))
         self.labelPlotControl.setText(_translate("Pybridizer", "plot control"))
