@@ -31,7 +31,7 @@ ENERGY_COLOR = 'salmon'
 INACTIVE_COLOR = 'gray'
 FLAT_COLOR = 'lightgray'
 MARKER_COLOR = 'darkslategray'
-COLOR_MAP = 'rainbow'
+COLOR_MAP = 'winter' # rainbow
 
 class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
     def __init__(self, parent=None):
@@ -448,6 +448,11 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         if self.activations is None:
             self.disable_GUI()
             self.activations = self.recording.count_spikes(C=6).astype(np.float)
+
+            # clip activations for visual purposes
+            pct = np.percentile(self.activations, 90)
+            self.activations[self.activations > pct] = pct
+
             self.enable_GUI()
 
         if self.checkHeatMap.isChecked():
