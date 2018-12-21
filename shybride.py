@@ -19,8 +19,8 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
-from hybridizer.ui import design
-from hybridizer.io import Recording, SpikeClusters, Phy
+from hybridizer.ui import design, import_template, insert_template
+from hybridizer.io import Recording, SpikeClusters, Phy, RectangularProbe
 from hybridizer.spikes import SpikeTrain
 
 CHOOSE_CLUSTER = 'select cluster'
@@ -35,6 +35,7 @@ COLOR_MAP = 'winter' # rainbow
 
 class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
     def __init__(self, parent=None):
+        # setup main UI
         super(self.__class__, self).__init__(parent)
         self.setupUi(self)
 
@@ -67,6 +68,9 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.btnResetZoom.clicked.connect(self.reset_view_plot)
         self.btnZoom.clicked.connect(self.zoom_plot)
         self.btnPan.clicked.connect(self.pan_plot)
+
+        self.btnTemplateExport.clicked.connect(self.export_template)
+        self.btnTemplateImport.clicked.connect(self.import_template)
 
         self.btnZoom.setCheckable(True)
         self.btnPan.setCheckable(True)
@@ -116,6 +120,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.axes_color.set_facecolor(bg_color)
         self.colorBar.addWidget(canvas_color)
 
+
     """
     Methods related to data loading and cluster selection
     """
@@ -153,6 +158,13 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                                            data_conf['fs'], data_conf['dtype'],
                                            order=data_conf['order'])
 
+                # TODO use this more advanced probe class throughout the entire
+                # program
+                self.connected_probe = RectangularProbe()
+                self.connected_probe.fill_channels(self.recording.probe.geometry)
+                self.connected_probe.connect_channels()
+                self.connected_probe.validate_probe_graph()
+
                 for clus_mode in data_clus.keys():
                     # load cluster information from phy
                     if clus_mode == 'phy':
@@ -181,7 +193,14 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         """ Fill the cluster select dropdown menu
         """
         good_clusters = self.clusters.keys().tolist()
+
+        if len(good_clusters) > 0:
+            self._import_counter = np.array(good_clusters).max()
+        else:
+            self._import_counter = 0
+
         self.good_clusters = [CHOOSE_CLUSTER] + np.sort(good_clusters).astype('str').tolist()
+
         self.listClusterSelect.clear()
         self.listClusterSelect.addItems(self.good_clusters)
 
@@ -198,7 +217,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
     Methods related to the template only view
     """
 
-    def draw_template(self, calcTemp=True):
+    def draw_template(self, calcTemp=True, template=None):
         """ (Calculate and) draw template
         """
         # check if given window converts to a float
@@ -216,7 +235,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
              QtWidgets.QMessageBox.critical(self, 'Invalid window size',
                                             'Please provide a valid spike window size.')
         else:
-            if calcTemp:
+            if calcTemp and template is None:
                 self.disable_GUI()
 
                 if self._current_cluster in self.generated_GT.keys():
@@ -237,6 +256,15 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
                 self.enable_GUI()
 
+            elif not template is None:
+                self.spikeTrain = SpikeTrain(self.recording, np.array([]))
+                # if template is given through import overwrite
+                self.spikeTrain.calculate_template()
+
+                # overwrite data
+                self.spikeTrain.template.data = template
+                self.spikeTrain.template.window_size = template.shape[1]
+
             # draw template
             self.axes.clear()
             self._template_scaling = self.plot_multichannel(self.spikeTrain.template.data)
@@ -249,7 +277,12 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             # enable options for further use
             self.radioTemplate.setChecked(True)
             self.radioTemplate.setEnabled(True)
-            self.radioFit.setEnabled(True)
+            if template is None:
+                self.radioFit.setEnabled(True)
+            else:
+                self.radioFit.setEnabled(False)
+
+            self.btnTemplateExport.setEnabled(True)
 
             if self._current_cluster in self.generated_GT.keys():
                 # self.radioMove.setEnabled(False)
@@ -293,12 +326,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         # solution with less lag (see actual replotting code))
         self.template_fit_active = enabled
 
-        if self._current_cluster in self.generated_GT.keys():
-            self.checkBoxLower.setEnabled(False)
-            self.checkBoxUpper.setEnabled(False)
-        else:
-            self.checkBoxLower.setEnabled(enabled)
-            self.checkBoxUpper.setEnabled(enabled)
+        self.checkBoxLower.setEnabled(enabled)
+        self.checkBoxUpper.setEnabled(enabled)
 
         if enabled == True:
             self.labelSpike.setText('1/{} '.format(int(self.spikeTrain.spikes.size)))
@@ -453,6 +482,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             pct = np.percentile(self.activations, 90)
             self.activations[self.activations > pct] = pct
 
+            self.sig_power = self.recording.get_signal_power()
+
             self.enable_GUI()
 
         if self.checkHeatMap.isChecked():
@@ -472,12 +503,13 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         """
         self.render_shifted_template()
 
-    def show_color_bar(self, show):
+    def show_color_bar(self, show, show_labels=True):
         """ Show colorbar if show == True, else hide
         """
         if show:
-            self.labelLow.setText('0')
-            self.labelHigh.setText('{}'.format(int(self.activations.max())))
+            if show_labels:
+                self.labelLow.setText('0')
+                self.labelHigh.setText('{}'.format(int(self.activations.max())))
 
             cmap = cm.get_cmap(COLOR_MAP)
             mpl.colorbar.ColorbarBase(self.axes_color, cmap=cmap,
@@ -495,65 +527,72 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
     def execute_move(self):
         """ Move shifted template in the data
         """
-        # subtract train: all spikes are removed, so not only the onces within
-        # the bounds
-        self.spikeTrain.subtract_train()
+        if self.radioFit.isEnabled():
+            # subtract train: all spikes are removed, so not only the onces within
+            # the bounds
+            self.spikeTrain.subtract_train()
+    
+            # re-insert the shifted template for the selected energy interval
+            sorted_idxs = self.spikeTrain.get_energy_sorted_idxs().copy()
+            sorted_spikes = self.spikeTrain.retrieve_energy_sorted_spikes().copy()
+    
+            if self._energy_LB is None:
+                l_idx = None
+            else:
+                l_idx = self._energy_LB+1 # exclusive
+    
+            if self._energy_UB is None:
+                u_idx = None
+            else:
+                u_idx = self._energy_UB # also exclusive, but handled by python
+    
+            sorted_spikes_slice = sorted_spikes[l_idx:u_idx]
+            sorted_idxs = sorted_idxs[l_idx:u_idx]
+    
+            assert(sorted_spikes_slice.shape == sorted_idxs.shape)
+    
+            print('# {} spikes considered for migration'.format(int(sorted_spikes_slice.size)))
+    
+            # add fixed temporal offset to avoid residual correlation
+            time_shift = int(2*self._window_samples)
+            sorted_spikes_insert = sorted_spikes_slice + time_shift
+    
+            # insertion shifted template
+            sorted_template_fit = self.spikeTrain._template_fitting[sorted_idxs]
+    
+            assert(sorted_spikes_slice.shape == sorted_template_fit.shape)
+    
+            inserted_spikes = self.spikeTrain.insert_given_train(sorted_spikes_insert,
+                                                                 self.spikeTrain.template.shifted_template,
+                                                                 sorted_template_fit)
 
-        # re-insert the shifted template for the selected energy interval
-        sorted_idxs = self.spikeTrain.get_energy_sorted_idxs().copy()
-        sorted_spikes = self.spikeTrain.retrieve_energy_sorted_spikes().copy()
+            self.spikeTrain.update(inserted_spikes)
 
-        if self._energy_LB is None:
-            l_idx = None
+            print('# {} spikes migrated'.format(int(inserted_spikes.size)))
+
+            self.generated_GT[self._current_cluster] = inserted_spikes
+
+            # keep track
+            # TODO remove duplication
+            self.disable_GUI()
+            self.spikeTrain.fit_spikes()        
+            self.enable_GUI()
+    
+            self.reset_energy_bounds()
+    
+            # enable export
+            self.btnExport.setEnabled(True)
+    
+            self.radioTemplate.setChecked(True)
+            self.draw_template(calcTemp=False)
+    
+            # repaint choice in cluster list
+            idx = self.listClusterSelect.findText(str(int(self._current_cluster)))
+            self.listClusterSelect.model().item(idx).setForeground(QtCore.Qt.gray)
+
         else:
-            l_idx = self._energy_LB+1 # exclusive
-
-        if self._energy_UB is None:
-            u_idx = None
-        else:
-            u_idx = self._energy_UB # also exclusive, but handled by python
-
-        sorted_spikes_slice = sorted_spikes[l_idx:u_idx]
-        sorted_idxs = sorted_idxs[l_idx:u_idx]
-
-        assert(sorted_spikes_slice.shape == sorted_idxs.shape)
-
-        print('# {} spikes considered for migration'.format(int(sorted_spikes_slice.size)))
-
-        # add fixed temporal offset to avoid residual correlation
-        time_shift = int(2*self._window_samples)
-        sorted_spikes_insert = sorted_spikes_slice + time_shift
-
-        # insertion shifted template instead of random permutation
-        sorted_template_fit = self.spikeTrain._template_fitting[sorted_idxs]
-
-        assert(sorted_spikes_slice.shape == sorted_template_fit.shape)
-
-        inserted_spikes = self.spikeTrain.insert_given_train(sorted_spikes_insert,
-                                                             self.spikeTrain.template.shifted_template,
-                                                             sorted_template_fit)
-
-        print('# {} spikes migrated'.format(int(inserted_spikes.size)))
-
-        # keep track
-        self.generated_GT[self._current_cluster] = inserted_spikes
-
-        self.disable_GUI()
-        self.spikeTrain.update(inserted_spikes)
-        self.spikeTrain.fit_spikes()        
-        self.enable_GUI()
-
-        self.reset_energy_bounds()
-
-        # enable export
-        self.btnExport.setEnabled(True)
-
-        self.radioTemplate.setChecked(True)
-        self.draw_template(calcTemp=False)
-
-        # repaint choice in cluster list
-        idx = np.where(np.array(self.good_clusters) == str(int(self._current_cluster)))[0][0]
-        self.listClusterSelect.model().item(idx).setForeground(QtCore.Qt.gray)
+            # insert template
+            self.build_insert_dialog()
 
 
     """
@@ -581,6 +620,245 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self.generated_GT.dumpCSV(csv_path)
             self.enable_GUI()
 
+
+    """
+    Methods related to exporting the active template
+    """
+
+    def export_template(self):
+        """ Export template
+        """
+        # define channels that have to be exported
+        channels = self.channels_within_lims()
+
+        # sort these channels using the connected probe model
+        channels = self.connected_probe.sort_given_channel_idx(channels)
+
+        # ask feedback about number of export channels
+        reply = QtWidgets.QMessageBox.question(self, 'export template', 
+                                               'Export {} channels?'.format(channels.size),
+                                               QtWidgets.QMessageBox.Yes,
+                                               QtWidgets.QMessageBox.No)
+
+        if reply == QtWidgets.QMessageBox.Yes:
+            # open dialog to export
+            self.dump_template(channels)                
+
+    def channels_within_lims(self):
+        """ Return a list of channels that are withing the main figures
+        current zoom
+        """
+        xlims = self.axes.get_xlim()
+        ylims = self.axes.get_ylim()
+
+        min_geo = self.recording.probe.get_min_geometry()
+        max_geo = self.recording.probe.get_max_geometry()
+
+        # probe info
+        x_bias = -min_geo[0]
+        y_bias = -min_geo[1]
+
+        x_range = max_geo[0] - min_geo[0]
+        y_range = max_geo[1] - min_geo[1]
+
+        channels = np.array([])
+
+        for idx, channel in enumerate(self.recording.probe.channels):
+            geo = self.recording.probe.geometry[channel]
+
+            x_start = (geo[0] - x_bias) / x_range
+            y_start = (geo[1] - y_bias) / y_range
+
+            if (xlims[0] <= x_start) and (x_start <= xlims[1]):
+                if (ylims[0] <= y_start) and (y_start <= ylims[1]):
+                    channels = np.append(channels, channel)
+
+        return channels
+
+    def dump_template(self, channels):
+        """ Export the template in CSV format
+        """
+        export_path, _ = \
+            QtWidgets.QFileDialog.getSaveFileName(self,
+                                                  'export template',
+                                                  directory=self._select_path,
+                                                  filter='CSV (*.csv)')
+
+        if export_path != '':
+            export_template = self.spikeTrain.template.data[channels.astype(np.int)]
+
+            # normalize template before exporting
+            export_template = export_template / export_template.std()
+
+            # dump csv
+            np.savetxt(export_path, export_template, delimiter=',')
+
+
+    """
+    Methods related to importing a template for insertion
+    """
+    def build_import_dialog(self):
+        """ Build the graphical template import dialog
+        """
+        self.importTemplateContainer = QtWidgets.QDialog(self)
+        # constructor does nothing
+        self.importTemplateDialog = import_template.Ui_DialogTemplateImport()
+        self.importTemplateDialog.setupUi(self.importTemplateContainer)
+        # prevent dialog resize
+        self.importTemplateContainer.setFixedSize(self.importTemplateContainer.size())
+
+        # template import dialog listeners
+        self.importTemplateDialog.btnSelectTemplate.clicked.connect(self.select_template)
+        
+        self.importTemplateDialog.buttonBox.accepted.connect(self.accept_import_dialog)
+
+        self.importTemplateContainer.exec()
+
+    def import_template(self):
+        """ Show import template dialog
+        """
+        # build on the fly
+        self.build_import_dialog()
+
+    def select_template(self):
+        """ Click listener that opens a file dialog for selecting the template
+        csv for import
+        """
+        # open a csv file selection dialog
+        template_file, _ = QtWidgets.QFileDialog.\
+            getOpenFileName(self,
+                            'select template',
+                            directory=self._select_path,
+                            filter='CSV (*.csv)')
+
+        if template_file != '':
+            self.imported_template = np.loadtxt(template_file, delimiter=',')
+            nbChannels = self.imported_template.shape[0]
+            window = self.imported_template.shape[1]
+
+            self.importTemplateDialog.nbChannels.\
+                setText('detected {} channels\n'
+                        'with {} samples each'.format(nbChannels,
+                                                      window))
+
+            self.importTemplateDialog.buttonBox.setEnabled(True)
+
+    def accept_import_dialog(self):
+        """ Accept import dialog
+        """
+        x_reach = self.importTemplateDialog.boxReach.value()
+        x_offset = self.importTemplateDialog.boxOffset.value()
+
+        mapped_channels =\
+            self.connected_probe.get_channels_from_zone(self.imported_template.shape[0],
+                                                        x_reach, x_offset)
+
+        nb_good = self.recording.get_nb_good_channels()
+        window = self.imported_template.shape[1]
+
+        template = np.zeros((nb_good, window))
+
+        for idx, mapped_channel in enumerate(mapped_channels):
+            if not mapped_channel is None:
+                template[mapped_channel] = self.imported_template[idx]
+
+        # set window in ms for completeness
+        self.fieldWindowSize.selectAll()
+        self.fieldWindowSize.del_()
+
+        real_window = window / self.recording.sampling_rate * 1000
+        self.fieldWindowSize.setText(str(real_window))
+
+        self.draw_template(calcTemp=False, template=template)
+
+        # TODO build template object and fit in current workflow
+        self.importTemplateContainer.close()
+
+    def build_insert_dialog(self):
+        """ Build the graphical template import dialog
+        """
+        self.insertTemplateContainer = QtWidgets.QDialog(self)
+        # constructor does nothing
+        self.insertTemplateDialog = insert_template.Ui_DialogInsertTemplate()
+        self.insertTemplateDialog.setupUi(self.insertTemplateContainer)
+        # prevent dialog resize
+        self.insertTemplateContainer.setFixedSize(self.insertTemplateContainer.size())
+        
+        self.insertTemplateDialog.buttonBox.accepted.connect(self.insert_template)
+
+        self.insertTemplateContainer.exec()
+
+    def insert_template(self):
+        """ Destroy the graphical template import dialog
+        """
+        # refractory period
+        snr = self.insertTemplateDialog.boxSNR.value()
+        rate = self.insertTemplateDialog.boxRate.value()
+        refr = self.insertTemplateDialog.boxRefr.value()
+
+        # poisson distribution for spike times
+        spike = 0
+        dur = self.recording.get_duration()
+        lam = self.recording.sampling_rate / rate
+        refr = int(self.recording.sampling_rate * refr / 1000) # discretize
+
+        spikes_insert = np.array([], dtype=np.int)
+        while spike < dur:
+            isi = np.random.poisson(lam=lam)
+            if isi < refr:
+                isi = refr
+            spike += isi
+
+            spikes_insert = np.append(spikes_insert, spike)
+
+        # scale waveform to insert
+        insert_waveform = self.spikeTrain.template.shifted_template
+        peak = np.abs(insert_waveform).max()
+        desired_peak_power = 10**(snr/10) * self.sig_power
+        insert_waveform = insert_waveform / peak * np.sqrt(desired_peak_power)
+
+        # insert scaled template
+        inserted_spikes = self.spikeTrain.insert_given_train(spikes_insert,
+                                                             insert_waveform,
+                                                             np.ones(spikes_insert.shape))
+
+        self.spikeTrain.update(inserted_spikes)
+
+        print('# {} spikes inserted'.format(int(inserted_spikes.size)))
+
+        # get counter information
+        self._import_counter = self._import_counter + 1
+        self._current_cluster = self._import_counter
+
+        new_item = str(int(self._current_cluster))
+
+        # add the new cluster to the dropdown and select
+        self.listClusterSelect.addItem(new_item)
+        self.listClusterSelect.setCurrentIndex(self.listClusterSelect.findText(new_item))
+
+        self.generated_GT[self._current_cluster] = inserted_spikes
+
+        print('# Inserted spikes were assigned to new cluster', new_item)
+
+        self.insertTemplateContainer.close()
+
+        # keep track
+        # TODO remove duplication
+        self.disable_GUI()
+        self.spikeTrain.fit_spikes()
+        self.enable_GUI()
+
+        self.reset_energy_bounds()
+
+        # enable export
+        self.btnExport.setEnabled(True)
+
+        self.radioTemplate.setChecked(True)
+        self.draw_template(calcTemp=False)
+
+        # repaint choice in cluster list
+        idx = self.listClusterSelect.findText(str(int(self._current_cluster)))
+        self.listClusterSelect.model().item(idx).setForeground(QtCore.Qt.gray)
 
     """
     Methods related to plotting on the GUI canvas
@@ -786,6 +1064,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self._current_spike = None
 
         self.activations = None
+        self.sig_power = None
 
     def reset_GUI_initial(self):
         """ Reset GUI to initial enabled state
@@ -801,6 +1080,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.set_move_template_enabled(False)
 
         self.btnExport.setEnabled(False)
+        self.btnTemplateExport.setEnabled(False)
+        self.btnTemplateImport.setEnabled(True)
 
         self.reset_energy_bounds()
         self.clear_canvas(redraw=True)
@@ -843,6 +1124,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.GUI_status['btnZoom'] = self.btnZoom.isEnabled()
         self.GUI_status['btnPan'] = self.btnPan.isEnabled()
         self.GUI_status['checkHeatMap'] = self.checkHeatMap.isEnabled()
+        self.GUI_status['btnTemplateImport'] = self.btnTemplateImport.isEnabled()
+        self.GUI_status['btnTemplateExport'] = self.btnTemplateExport.isEnabled()
 
     def disable_GUI(self):
         """ Disable GUI
@@ -878,6 +1161,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self.btnZoom.setEnabled(False)
             self.btnPan.setEnabled(False)
             self.checkHeatMap.setEnabled(False)
+            self.btnTemplateImport.setEnabled(False)
+            self.btnTemplateExport.setEnabled(False)
 
             # force repainting of entire GUI
             self.repaint()
@@ -905,6 +1190,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.btnZoom.setEnabled(self.GUI_status['btnZoom'])
         self.btnPan.setEnabled(self.GUI_status['btnPan'])
         self.checkHeatMap.setEnabled(self.GUI_status['checkHeatMap'])
+        self.btnTemplateImport.setEnabled(self.GUI_status['btnTemplateImport'])
+        self.btnTemplateExport.setEnabled(self.GUI_status['btnTemplateExport'])
 
         self.GUI_enabled = True
 
@@ -914,8 +1201,20 @@ def main():
     """
     app = QtWidgets.QApplication(sys.argv)
 
+    # classic style
     form = Pybridizer()
     form.show()
+
+#    # dark style
+#    qt_styles.dark(app)
+#    mw = qt_windows.ModernWindow(form)
+#    mw.show()
+
+#    # use timer to run init routine
+#    timer = QtCore.QTimer()
+#    timer.timeout.connect(form.init_colorbar)
+#    timer.start(10)
+
     app.exec_()
 
 

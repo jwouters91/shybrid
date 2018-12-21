@@ -4,7 +4,7 @@
 ## Installation instructions
 1. Install miniconda (Python 3.x version) for your operaring system. Please follow the official conda.io [instructions](https://conda.io/docs/user-guide/install/index.html#regular-installation).
 2. Clone this GIT project on your local machine:
-``` 
+```
 git clone https://gitlab.esat.kuleuven.be/Jasper.Wouters/shy.bride.git
 ```
 3. Create a conda environment for SHY BRIDE:
@@ -39,12 +39,15 @@ To generate hybrid ground truth spiking data the following files are required by
 	* phy format
 * yaml-file having the same name as the recording (e.g. recording.yml) containing:
 	* binary format meta information
+		* fs: sampling frequency
+		* dtype : the datatype used to represent the data
+		* order : the order in which the data matrix is serialized (F: by stacking columns, or C: by stacking rows)
 	* path to probe file
 	* path to cluster information
 
 An example yaml file (recording.yml) is given below (all parameters shown are mandatory):
 
-``` 
+```
 ---
 # parameters used by SHY BRIDE
 data:
@@ -59,7 +62,7 @@ clusters:
 ```
 An example that reads single-unit cluster information directly from phy is given below:
 
-``` 
+```
 ---
 # parameters used by SHY BRIDE (using phy clusters)
 data:
@@ -73,5 +76,15 @@ clusters:
 ...
 ```
 
+### Exporting template
+A template can exported as a CSV file. Every channel is exported as a row in the CSV dump. The order in which the channels are exported is depending on the order of the channels in the probe file. For proper reconstruction, the channels in the probe file should be order based on the actual geometry. More concretely, channels are assumed to be ordered by increasing x- and increasing y-coordinates, with the x-coordinate being the fastest changing variable.
+
+A subset of channels can be exported by using the zoom functionality. All channels which have their leftmost plotted point in the zoom window are considered for exporting.
+
+### Importing template
+Import a template from CSV, where every row in the CSV-file represents the waveform on a channel. The window size is automatically determined.
+
+When working with an imported template, the inspect template fit feature will be disabled until a spatial location is chosen and the template is actually inserted in the recording.
+
 ### Exporting hybrid data
-Note: the exported binary is vectorized using the C-style formatting (row-major), this independent of the format of the original data.
+Note: the exported binary is vectorized using the C-style formatting (row-major), this independent of the format of the original data. As this might be different from the original data, the user has to keep this in mind when doing further processing.
