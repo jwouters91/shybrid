@@ -934,14 +934,20 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
         energy = energy[sorted_idxs]
 
+        unit_line = 1 - energy.min()
         energy = energy - energy.min()
+
+        unit_line = unit_line / energy.max()
         energy = energy / energy.max()
 
         xlim = self.axes.get_xlim()
         ylim = self.axes.get_ylim()
 
-        y_range = (ylim[1] - ylim[0]) / 15
+        y_range = (ylim[1] - ylim[0]) / 15 # arbitrary portion of the screen
+
+        unit_line = unit_line * y_range + ylim[0]
         energy = energy * y_range + ylim[0]
+
         bottom = np.zeros(energy.shape) + ylim[0]
 
         x_range = xlim[1] - xlim[0]
@@ -979,6 +985,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                                       linewidth=3, zorder=2)
         self.axes.plot(x[self._current_spike], energy[self._current_spike],
                        color=MARKER_COLOR, marker='|')
+
+        self.axes.plot(x, np.ones(x.shape)*unit_line, 'k--', linewidth=0.5)
 
         # draw
         self.axes.figure.canvas.draw()
