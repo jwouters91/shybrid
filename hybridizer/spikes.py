@@ -331,9 +331,11 @@ class Template:
                                    shifted_PC=False):
         """ Calculate shifted template
         """
+        # initialize shifted template
         shifted_template = np.zeros(spike_train.template.data.shape)
         if shifted_PC: shifted_PC = np.zeros(spike_train.template.PC.shape)
 
+        # extract geometrical information
         x_between = spike_train.recording.probe.x_between
         y_between = spike_train.recording.probe.y_between
 
@@ -344,11 +346,25 @@ class Template:
             geo_x = geo[0] - x_shift * x_between
             geo_y = geo[1] - y_shift * y_between
 
+            # if this location is not located on the probe we can continue
+            # this prevents extrapolation from happening
+            if geo_x < spike_train.recording.probe.x_min:
+                continue
+            if geo_x > spike_train.recording.probe.x_max:
+                continue
+            if geo_y < spike_train.recording.probe.y_min:
+                continue
+            if geo_y > spike_train.recording.probe.y_max:
+                continue
+
+            # initialize interpolated waveform
             interpolated_waveform = np.zeros(spike_train.template.data[0].shape)
             if shifted_PC: interpolated_PC = np.zeros(spike_train.template.PC[0].shape)
 
             interpolation_count = 0
             interpolation_needed = True
+
+            # loop over channels to find the projection channel
             for jdx, project_channel in enumerate(spike_train.recording.probe.channels):
                 project_geo = spike_train.recording.probe.geometry[project_channel]
 
