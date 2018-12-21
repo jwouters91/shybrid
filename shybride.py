@@ -331,8 +331,10 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
         if enabled == True:
             self.labelSpike.setText('1/{} '.format(int(self.spikeTrain.spikes.size)))
+            # labelfit is set in energy plotting routine
         else:
             self.labelSpike.setText('')
+            self.labelFit.setText('')
 
     def render_current_spike(self):
         """ Function that actually plots the current spike and the template
@@ -933,6 +935,9 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         energy = self.spikeTrain._fitting_energy.copy()
 
         energy = energy[sorted_idxs]
+
+        # show fit
+        self.labelFit.setText('factor {:.3f} '.format(energy[self._current_spike]))
 
         unit_line = 1 - energy.min()
         energy = energy - energy.min()
