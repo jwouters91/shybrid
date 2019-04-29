@@ -45,9 +45,19 @@ class Recording:
 
         sampling_rate (int): sampling rate of the data
     """
+    # only signed datatypes are accepted for now, this is also the most natural
+    # representation for extracellular recordings.
+    supported_dtypes = ('float32', 'float64', 'int16', 'int32')
 
     def __init__(self, fn, probe_fn, sampling_rate, dtype,
                  mode='c', order='C'):
+        # check if the given datatype is supported
+        if dtype not in self.supported_dtypes:
+            raise TypeError('The given data type ({}) is not supported. '
+                            'Only the following signed types are supported: {}'
+                                .format(dtype,
+                                        self.supported_dtypes))
+
         # keep track of parameter for dump
         self._fn = fn
         self._dtype = dtype

@@ -153,10 +153,19 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                 data_conf = config['data']
                 data_clus = config['clusters']
 
-                # initialise program objects
-                self.recording = Recording(raw_fn, data_conf['probe'],
-                                           data_conf['fs'], data_conf['dtype'],
-                                           order=data_conf['order'])
+                try:
+                    # initialise program objects
+                    self.recording = Recording(raw_fn, data_conf['probe'],
+                                               data_conf['fs'], data_conf['dtype'],
+                                               order=data_conf['order'])
+                except TypeError as e:
+                    # throw message box if provided type is not supported
+                    QtWidgets.QMessageBox.critical(self, 'type error', str(e))
+
+                    self.reset_GUI_initial(data_loaded=False)
+                    self.listClusterSelect.addItems(self.good_clusters)
+
+                    return
 
                 # TODO use this more advanced probe class throughout the entire
                 # program
@@ -200,6 +209,14 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self._import_counter = 0
 
         self.good_clusters = [CHOOSE_CLUSTER] + np.sort(good_clusters).astype('str').tolist()
+
+        self.listClusterSelect.clear()
+        self.listClusterSelect.addItems(self.good_clusters)
+
+    def clear_cluster_dropdown(self):
+        """ Clear the cluster dropdown menu
+        """
+        self.good_clusters = [CHOOSE_CLUSTER]
 
         self.listClusterSelect.clear()
         self.listClusterSelect.addItems(self.good_clusters)
@@ -1081,7 +1098,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.activations = None
         self.sig_power = None
 
-    def reset_GUI_initial(self):
+    def reset_GUI_initial(self, data_loaded=True):
         """ Reset GUI to initial enabled state
         """
         self.btnDraw.setEnabled(False)
@@ -1096,7 +1113,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
         self.btnExport.setEnabled(False)
         self.btnTemplateExport.setEnabled(False)
-        self.btnTemplateImport.setEnabled(True)
+        self.btnTemplateImport.setEnabled(data_loaded)
 
         self.reset_energy_bounds()
         self.clear_canvas(redraw=True)
