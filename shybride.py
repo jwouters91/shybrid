@@ -132,7 +132,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             getOpenFileName(self,
                             'select raw recording',
                             directory=self._select_path,
-                            filter='raw recording (*.raw *.bin)')
+                            filter='raw recording (*.raw *.bin *.dat)')
 
         if raw_fn != "": # empty string is returned if cancel is pushed
             # update select path for user convenience
@@ -608,7 +608,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             QtWidgets.QFileDialog.getSaveFileName(self,
                                                   'save hybrid recording',
                                                   directory=self._select_path,
-                                                  filter='raw recording (*.raw *.bin)')
+                                                  filter='raw recording (*.raw *.bin *.dat)')
 
         if export_path != '':
             # generate GT path
@@ -798,7 +798,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         rate = self.insertTemplateDialog.boxRate.value()
         refr = self.insertTemplateDialog.boxRefr.value()
 
-        # poisson distribution for spike times
+        # poisson distribution spike times
         spike = 0
         dur = self.recording.get_duration()
         lam = self.recording.sampling_rate / rate
@@ -887,7 +887,9 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         min_dat = data.min()
         max_dat = data.max()
 
-        dat_range = 0.5 * (max_dat - min_dat)
+        # adapt distance between channels
+        range_scaler = 1.1
+        dat_range = range_scaler * (max_dat - min_dat)
 
         if dat_range == 0:
             # everything zero

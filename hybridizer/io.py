@@ -70,6 +70,7 @@ class Recording:
         self.data = self.data.reshape((nb_channels,
                                        self.data.size // nb_channels),
                                        order=order)
+
         self.sampling_rate = sampling_rate
 
     def get_nb_good_channels(self):
@@ -96,7 +97,7 @@ class Recording:
         """  Save the data in raw format in the original data folder
         """
         # save transpose such that file is compatible with spyking circus
-        self.data.T.tofile(full_fn)
+        self.data.astype(self._dtype).T.tofile(full_fn)
 
     def save_npy(self):
         """ Save the data in npy format in the original data folder
@@ -263,14 +264,14 @@ class Phy:
     def _get_spike_cluster_mask(self, cluster_id):
         """ Return the spike cluster mask for the given cluster_id
         """
-        spike_clusters = np.load(self._get_path_to(Phy._SPIKE_CLUSTERS))
+        spike_clusters = np.load(self._get_path_to(Phy._SPIKE_CLUSTERS)).flatten()
         # choice for boolean mask over indices for clarity
         return spike_clusters == cluster_id
 
     def _get_spike_times(self):
         """ Return all spike times
         """
-        return np.load(self._get_path_to(Phy._SPIKE_TIMES))
+        return np.load(self._get_path_to(Phy._SPIKE_TIMES)).flatten()
 
 
 class Probe:

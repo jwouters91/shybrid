@@ -210,7 +210,7 @@ class Template:
     """
 
     def __init__(self, spike_train, window_size, realign=False,
-                 force_zero=True, calculate_PC=False):
+                 force_zero=True, calculate_PC=False, zf_frac=0.03):
         self.window_size = window_size
 
         # build spike tensor
@@ -236,7 +236,7 @@ class Template:
         if force_zero:
             energy = self.data**2
             energy = np.sum(energy, axis=1)
-            self.data[energy<0.01*energy.max(),:] = 0
+            self.data[energy<zf_frac*energy.max(),:] = 0
 
         if realign:
             offsets = np.zeros(spike_train.get_nb_spikes())
