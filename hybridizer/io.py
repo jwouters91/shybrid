@@ -47,7 +47,7 @@ class Recording:
     """
     # only signed datatypes are accepted for now, this is also the most natural
     # representation for extracellular recordings.
-    supported_dtypes = ('float32', 'float64', 'int16', 'int32')
+    supported_dtypes = ('float32', 'float64', 'double', 'int16', 'int32')
 
     def __init__(self, fn, probe_fn, sampling_rate, dtype,
                  mode='c', order='C'):

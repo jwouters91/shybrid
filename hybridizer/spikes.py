@@ -26,11 +26,12 @@ class SpikeTrain:
         # init this cache, sorting only once on first request
         self._energy_sorted_idxs = None
 
-    def calculate_template(self, window_size=100, realign=False):
+    def calculate_template(self, window_size=100, realign=False, zf_frac=0.03):
         """ Calculate a template for this spike train for the given discrete
         window size
         """
-        self.template = Template(self, window_size, realign=realign)
+        self.template = Template(self, window_size, realign=realign,
+                                 zf_frac=zf_frac)
 
     def get_nb_spikes(self):
         """ Return the number of spikes in the spike train

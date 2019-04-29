@@ -47,6 +47,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.btnDataSelect.clicked.connect(self.select_data)
         self.listClusterSelect.activated.connect(self.select_cluster)
         self.btnDraw.clicked.connect(lambda: self.draw_template(calcTemp=True))
+        self.zeroForceFraction.valueChanged.connect(lambda: self.draw_template(calcTemp=True))
         # don't recalculate template
         self.radioTemplate.clicked.connect(lambda: self.draw_template(calcTemp=False))
         self.radioFit.clicked.connect(self.template_fit)
@@ -163,7 +164,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                     QtWidgets.QMessageBox.critical(self, 'type error', str(e))
 
                     self.reset_GUI_initial(data_loaded=False)
-                    self.listClusterSelect.addItems(self.good_clusters)
+                    self.listClusterSelect.clear()
+                    self.listClusterSelect.addItems([CHOOSE_CLUSTER])
 
                     return
 
@@ -264,7 +266,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
                 # calculate template
                 self._window_samples = int(np.ceil(float(self.fieldWindowSize.text()) / 1000 * self.recording.sampling_rate))
-                self.spikeTrain.calculate_template(window_size=self._window_samples)
+                self.spikeTrain.calculate_template(window_size=self._window_samples,
+                                                   zf_frac=(self.zeroForceFraction.value() / 100))
 
                 # init fit factors
                 self.spikeTrain.fit_spikes()
@@ -296,11 +299,14 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self.radioTemplate.setEnabled(True)
             if template is None:
                 self.radioFit.setEnabled(True)
+                self.set_display_template_enabled(True)
             else:
                 self.radioFit.setEnabled(False)
+                self.set_display_template_enabled(False)
 
             self.btnTemplateExport.setEnabled(True)
 
+            # TODO I think this if else clause can be at least partially removed
             if self._current_cluster in self.generated_GT.keys():
                 # self.radioMove.setEnabled(False)
                 self.radioMove.setEnabled(True) # we opted for eternal program flow
@@ -312,6 +318,12 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self.set_template_fit_enabled(False)
             self.set_move_template_enabled(False)
 
+    def set_display_template_enabled(self, enabled):
+        """ Enable or disable the display template part of the GUI
+        """
+        self.zeroForceFraction.setEnabled(enabled)
+        self.zeroForceFraction.lineEdit().deselect()
+        self.zeroForceLabel.setEnabled(enabled)
 
     """ 
     Methods related to the template fit view
@@ -326,6 +338,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
         # activate and set slider
         self.horizontalSlider.setMaximum(self.spikeTrain.spikes.size-1)
+        self.set_display_template_enabled(False)
         self.set_template_fit_enabled(True)
         self.set_move_template_enabled(False)
 
@@ -429,6 +442,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
     def move_template(self):
         """ Switch to move template mode in GUI
         """
+        self.set_display_template_enabled(False)
         self.set_template_fit_enabled(False)
         self.set_move_template_enabled(True)
 
@@ -1108,6 +1122,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.radioFit.setEnabled(False)
         self.radioMove.setEnabled(False)
 
+        self.set_display_template_enabled(False)
         self.set_template_fit_enabled(False)
         self.set_move_template_enabled(False)
 
@@ -1158,6 +1173,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.GUI_status['checkHeatMap'] = self.checkHeatMap.isEnabled()
         self.GUI_status['btnTemplateImport'] = self.btnTemplateImport.isEnabled()
         self.GUI_status['btnTemplateExport'] = self.btnTemplateExport.isEnabled()
+        self.GUI_status['zeroForceFraction'] = self.zeroForceFraction.isEnabled()
 
     def disable_GUI(self):
         """ Disable GUI
@@ -1195,6 +1211,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self.checkHeatMap.setEnabled(False)
             self.btnTemplateImport.setEnabled(False)
             self.btnTemplateExport.setEnabled(False)
+            self.zeroForceFraction.setEnabled(False)
 
             # force repainting of entire GUI
             self.repaint()
@@ -1224,6 +1241,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.checkHeatMap.setEnabled(self.GUI_status['checkHeatMap'])
         self.btnTemplateImport.setEnabled(self.GUI_status['btnTemplateImport'])
         self.btnTemplateExport.setEnabled(self.GUI_status['btnTemplateExport'])
+        self.zeroForceFraction.setEnabled(self.GUI_status['zeroForceFraction'])
 
         self.GUI_enabled = True
 
