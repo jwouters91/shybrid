@@ -43,6 +43,9 @@ def validate_from_csv(gt_csv_fn, csv_sorting_fn, comparison_window=30):
     """
     pass
 
+""" F1 metric
+"""
+F1 = lambda prec, rec: 2 * prec * rec / (prec + rec) if prec + rec != 0 else 0
 
 """ UTILS
 """
@@ -110,6 +113,39 @@ class Segments:
 
         return contains
 
+    def calculate_precision_recall(self, gt_events):
+        """ Return the precision and recall for a given set of ground truth
+        events.
+
+        Parameters
+        ----------
+        gt_events (ndarray) : array containing ground truth events
+
+        Returns
+        -------
+        precision (float) : the fraction of detections that are true detections
+        (true positives) / (true positives + false positives)
+
+        recall (float) : the fraction of all positives that are retrieved
+        (true positives) / (true positives + false negatives)
+        """
+        contains_result = self.contains(gt_events)
+
+        # count the number of true detections
+        nb_true_positives = np.where(contains_result)[0].size
+
+        nb_positives = gt_events.size
+        nb_detections = self.nb_events
+
+        # Due to the windowing applied on the segments we might get more
+        # TP than detections. This is solved by the following line of code
+        nb_true_positives = min(nb_true_positives, nb_detections)
+
+        precision = nb_true_positives / nb_detections
+        recall = nb_true_positives / nb_positives
+
+        return precision, recall
+
     def merge(self, segments):
         """ Return a segments object that is merged from self and the given
         segments object.
@@ -162,9 +198,73 @@ class SegmentsCollection:
 
         return merged
 
+    def rank_clusters(self, gt_events):
+        """ Rank clusters by precision (single-unitness).
+
+        Parameters
+        ----------
+        gt_events (ndarray) : array containing ground truth events
+
+        Returns
+        -------
+        ranked_cluster (ndarray) : (nclusters, 2) array containing in the first
+        column the cluster id and in the second column the precision for that
+        cluster
+        """
+        clusters = list(self.collection)
+        ranked_clusters = np.zeros((clusters.size, 2))
+
+        for idx, cluster in enumerate(clusters):
+            segments = self.collection[cluster]
+
+            prec, _ = segments.calculate_precision_recall(gt_events)
+
+            ranked_clusters[idx, 0] = cluster
+            ranked_clusters[idx, 1] = prec
+
+        sorted_idxs = np.argsort(ranked_clusters[:,1])
+
+        return ranked_clusters[sorted_idxs[::-1]]
+
+    def auto_merge(self, gt_events):
+        """ Automatically merge clusters if combining ranked clusters leads to
+        increased F1-score.
+
+        Parameters
+        ----------
+        gt_events (ndarray) : array containing ground truth events
+
+        Returns
+        -------
+        merged_clusters (ndarray) : array containing cluster numbers that are
+        merge according to the increasing F1-metric.
+        """
+        ranked_clusters = self.rank_clusters(gt_events)
+
+        clusters_to_merge = np.array([ranked_clusters[0,0]])
+
+        merged_segments = self.merge_segments(clusters_to_merge)
+        prec, rec = merged_segments.calculate_precision_recall(gt_events)
+
+        accumulated_F1 = F1(prec, rec)
+
+        for next_cluster in ranked_clusters[1:,0]:
+            clusters_to_merge = np.concatenate((clusters_to_merge,
+                                                np.array([next_cluster])))
+
+            merged_segments = self.merge_segments(clusters_to_merge)
+            prec, rec = merged_segments.calculate_precision_recall(gt_events)
+
+            if F1(prec, rec) > accumulated_F1:
+                accumulated_F1 = F1(prec, rec)
+            else:
+                return clusters_to_merge[:-1]
+
+        return clusters_to_merge
+
 
 class SortingResults:
-    """ Model for spike sorting results.
+    """ Model for spike sorting results (or hybrid GT).
 
     Parameters
     ----------
@@ -186,7 +286,7 @@ class SortingResults:
 
     def __iter__(self):
         # use an iterator on the list of cluster idxs contained in the dict
-        cluster_idxs = list(self.clusters.keys())
+        cluster_idxs = list(self.clusters)
         self._key_iterator = cluster_idxs.__iter__()
 
         return self
