@@ -6,8 +6,11 @@ Created on Tue Apr 30 10:24:26 2019
 @author: Jasper Wouters
 """
 
+import os
+
 import numpy as np
 
+from hybridizer.io import Phy
 
 def validate_from_phy(gt_csv_fn, phy_sorting_path, comparison_window=30):
     """ Compare spike sorting results (in phy format) with a hybrid ground
@@ -24,9 +27,12 @@ def validate_from_phy(gt_csv_fn, phy_sorting_path, comparison_window=30):
     every sorted spike, to account for an offset between the spike sorting
     time stamps and the ground truth.
     """
-    pass
+    gt = SortingResults.fromCSV(gt_csv_fn)
+    sorting = SortingResults(Phy(phy_sorting_path).get_cluster_and_times())
 
-def validate_from_csv(gt_csv_fn, csv_sorting_fn, comparison_window=30):
+    validate(gt, sorting)
+
+def validate_from_csv(gt_csv_fn, sorting_csv_fn, comparison_window=30):
     """ Compare spike sorting results (in csv format) with a hybird ground
     truth. The results of this comparison are printed in the terminal.
 
@@ -34,21 +40,62 @@ def validate_from_csv(gt_csv_fn, csv_sorting_fn, comparison_window=30):
     ----------
     gt_csv_fn (str) : Full filename of hybrid ground truth csv file.
 
-    csv_sorting_fn (str) : Full filename of the csv file containing the spike
+    sorting_csv_fn (str) : Full filename of the csv file containing the spike
     sorting results.
 
     comparison_window (int, optional) : A discrete window that is placed around
     every sorted spike, to account for an offset between the spike sorting
     time stamps and the ground truth.
     """
-    pass
+    gt = SortingResults.fromCSV(gt_csv_fn)
+    sorting = SortingResults.fromCSV(sorting_csv_fn)
 
-""" F1 metric
-"""
-F1 = lambda prec, rec: 2 * prec * rec / (prec + rec) if prec + rec != 0 else 0
+    validate(gt, sorting)
+
+def validate(gt, sorting, comparison_window=30):
+    """ Compare spike sorting results with a hybird ground
+    truth. The results of this comparison are printed in the terminal.
+
+    Parameters
+    ----------
+    gt (SortingResults) : Sorting result object containing the ground truth.
+
+    sorting (SortingResults) : Sorting result object containing the sorting
+    results.
+
+    comparison_window (int, optional) : A discrete window that is placed around
+    every sorted spike, to account for an offset between the spike sorting
+    time stamps and the ground truth.
+    """
+    sorting_segments = SegmentsCollection(sorting, window=comparison_window)
+
+    _print_header()
+
+    for gt_cluster, gt_events in gt:
+        best_matching_clusters = sorting_segments.auto_merge(gt_events)
+        merged_segment = sorting_segments.merge(best_matching_clusters)
+
+        precision, recall = merged_segment.calculate_precision_recall(gt_events)
+
+        _print_values(gt_cluster, precision, recall, best_matching_clusters)
+
 
 """ UTILS
 """
+def _print_header():
+    print('gt_cluster;F1;precision;recall;nb_clusters;clusters')
+
+def _print_values(gt_cluster, precision, recall, matching_clusters):
+    print('{:d};{:.3f};{:.3f};{:.3f};{:d};{}'.format(int(gt_cluster),
+                                                     F1(precision, recall),
+                                                     precision,
+                                                     recall,
+                                                     matching_clusters.size,
+                                                     matching_clusters.tolist()))
+
+# F1 metric lambda helper function
+F1 = lambda prec, rec: 2 * prec * rec / (prec + rec) if prec + rec != 0 else 0
+
 class Segments:
     """ Class to model binary (windowed) event trains. The standard constructor
     returns a blank object.
@@ -170,6 +217,8 @@ class SegmentsCollection:
     Parameters
     ----------
     sorting_results (SortingResults) : A sorting results object.
+
+    window (int, optional) : Segments window (see Segments.from_events)
     """
     def __init__(self, sorting_results, window=5):
         self.collection = {}
@@ -178,7 +227,7 @@ class SegmentsCollection:
             self.collection[cluster] = Segments.from_events(events,
                                                             window=window)
 
-    def merge_segments(self, to_merge):
+    def merge(self, to_merge):
         """ Return a segments object containing the merged segments from all
         clusters provided in to_merge.
 
@@ -212,7 +261,7 @@ class SegmentsCollection:
         cluster
         """
         clusters = list(self.collection)
-        ranked_clusters = np.zeros((clusters.size, 2))
+        ranked_clusters = np.zeros((len(clusters), 2))
 
         for idx, cluster in enumerate(clusters):
             segments = self.collection[cluster]
@@ -243,7 +292,7 @@ class SegmentsCollection:
 
         clusters_to_merge = np.array([ranked_clusters[0,0]])
 
-        merged_segments = self.merge_segments(clusters_to_merge)
+        merged_segments = self.merge(clusters_to_merge)
         prec, rec = merged_segments.calculate_precision_recall(gt_events)
 
         accumulated_F1 = F1(prec, rec)
@@ -252,7 +301,7 @@ class SegmentsCollection:
             clusters_to_merge = np.concatenate((clusters_to_merge,
                                                 np.array([next_cluster])))
 
-            merged_segments = self.merge_segments(clusters_to_merge)
+            merged_segments = self.merge(clusters_to_merge)
             prec, rec = merged_segments.calculate_precision_recall(gt_events)
 
             if F1(prec, rec) > accumulated_F1:
@@ -279,10 +328,32 @@ class SortingResults:
     def __init__(self, cluster_events):
         self.clusters = {}
 
-        derived_clusters = self._all_clusters(cluster_events)
+        derived_clusters = SortingResults._all_clusters(cluster_events)
         for cluster in derived_clusters:
-            self.clusters[cluster] = self._events_from_cluster(cluster_events,
-                                                               cluster)
+            self.clusters[cluster] = SortingResults.\
+                _events_from_cluster(cluster_events, cluster)
+
+    @classmethod
+    def fromCSV(cls, csv_fn, delimiter=','):
+        """ Create a Sorting Results object from a csv file with two columns,
+        where the first column contains the cluster index and the second
+        column contains the discrete time of a spike.
+
+        Parameters
+        ----------
+        csv_fn (str) : Full filename of the csv file containing the sorting
+        results.
+
+        delimiter (str, optional) : The delimiter used in the csv file.
+
+        Returns
+        -------
+        sorting_results (SortingResults) : The corresponding SortingResults
+        object
+        """
+        cluster_events = np.loadtxt(csv_fn, delimiter=delimiter)
+
+        return cls(cluster_events)
 
     def __iter__(self):
         # use an iterator on the list of cluster idxs contained in the dict
@@ -295,3 +366,24 @@ class SortingResults:
         # return the next cluster information using an iterator on the keys
         cluster_idx = self._key_iterator.__next__()
         return cluster_idx, self.clusters[cluster_idx]
+
+
+if __name__ == '__main__':
+    root = '/media/jwouters/DATA/KU_LEUVEN/Paper_shybride/hybrid_sc'
+    full_fn = lambda fn : os.path.join(root, fn)
+
+    # non-curated spike sorting results
+    phy_ks = 'kilosort_more_clusters'
+
+    # ground truths
+    hybrid_gt = 'hybrid_GT.csv'
+
+    comparison_window = 10
+
+    print('test phy')
+    validate_from_phy(full_fn(hybrid_gt), full_fn(phy_ks),
+                      comparison_window=comparison_window)
+
+    print('\ntest csv')
+    validate_from_csv(full_fn(hybrid_gt), full_fn(hybrid_gt),
+                      comparison_window=comparison_window)

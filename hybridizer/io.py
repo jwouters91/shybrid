@@ -264,6 +264,21 @@ class Phy:
 
         return spike_times
 
+    def get_cluster_and_times(self):
+        """
+        Returns
+        -------
+        cluster_spikes (ndarray) : (nspikes, 2) numpy array containing in the
+        first column the cluster and in the second column the time of all
+        spikes
+        """
+        spike_clusters = np.load(self._get_path_to(Phy._SPIKE_CLUSTERS)).flatten()
+        spike_times = np.load(self._get_path_to(Phy._SPIKE_TIMES)).flatten()
+
+        return np.concatenate((spike_clusters[:,np.newaxis],
+                               spike_times[:,np.newaxis]),
+                              axis=1)
+
     """ Private methods section
     """
     def _get_path_to(self, fn):
