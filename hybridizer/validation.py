@@ -6,8 +6,6 @@ Created on Tue Apr 30 10:24:26 2019
 @author: Jasper Wouters
 """
 
-import os
-
 import numpy as np
 
 from hybridizer.io import Phy
@@ -366,24 +364,3 @@ class SortingResults:
         # return the next cluster information using an iterator on the keys
         cluster_idx = self._key_iterator.__next__()
         return cluster_idx, self.clusters[cluster_idx]
-
-
-if __name__ == '__main__':
-    root = '/media/jwouters/DATA/KU_LEUVEN/Paper_shybride/hybrid_sc'
-    full_fn = lambda fn : os.path.join(root, fn)
-
-    # non-curated spike sorting results
-    phy_ks = 'kilosort_more_clusters'
-
-    # ground truths
-    hybrid_gt = 'hybrid_GT.csv'
-
-    comparison_window = 10
-
-    print('test phy')
-    validate_from_phy(full_fn(hybrid_gt), full_fn(phy_ks),
-                      comparison_window=comparison_window)
-
-    print('\ntest csv')
-    validate_from_csv(full_fn(hybrid_gt), full_fn(hybrid_gt),
-                      comparison_window=comparison_window)
