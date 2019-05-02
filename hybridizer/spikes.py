@@ -168,33 +168,75 @@ class SpikeTrain:
         """
         self.spikes = self.spikes + offsets
 
-    def retrieve_energy_sorted_spike_time(self, spike_idx):
+    def get_energy_sorted_spike_time(self, spike_idx):
         """ Return the spike time from the energy sorted spike train for the
         given spike_idx
 
         This method requires that the energies have been initialized already
         """
-        return self.retrieve_energy_sorted_spikes()[spike_idx]
-
-    def retrieve_energy_sorted_spikes(self):
-        """ Return energy sorted spikes
-
-        This method requires that the energies have been initialized already
-        """
-        if self._energy_sorted_idxs is None:
-            self._energy_sorted_idxs = np.argsort(self._fitting_energy)
-
-        return self.spikes[self._energy_sorted_idxs]
+        return self.get_energy_sorted_spikes()[spike_idx]
 
     def get_energy_sorted_idxs(self):
-        """ Return energy sorted indices
+        """ Return energy sorted idxs.
 
-        This method requires that the energies have been initialized already
+        This method requires that the fitting factors have been initialized.
         """
         if self._energy_sorted_idxs is None:
             self._energy_sorted_idxs = np.argsort(self._fitting_energy)
 
         return self._energy_sorted_idxs
+
+    def get_energy_sorted_spikes(self):
+        """ Return energy sorted spikes
+
+        This method requires that the energies have been initialized already
+        """
+        return self.spikes[self.get_energy_sorted_idxs()]
+
+    def get_automatic_energy_bounds(self, C=0.75):
+        """ Return the lower and upper index obtained from applying robust
+        statistics.
+
+        Parameters
+        ----------
+        C (float) : Factor that determines the width of the interval that is
+        considered. The default value is a safe conservative choice, that will
+        lead to good spikes not reinserted during hybridization.
+
+        Returns
+        -------
+        lower_idx (int) : lower bound index in the energy sorted domain
+        that corresponds to Q1 - C * IQR.
+
+        upper_idx (int) : upper bound index in the energy sorted domain
+        that corresponds to Q3 + C * IQR.
+        """
+        # log space is considered to excluded values close to zero
+        pcts = np.percentile(np.log10(self._fitting_energy), [25.0, 75.0])
+
+        Q1 = pcts[0]
+        Q3 = pcts[1]
+
+        IQR = Q3 - Q1
+
+        lower_bound = Q1 - C * IQR
+        upper_bound = Q3 + C * IQR
+
+        energy_sorted_energy = np.log10(self._fitting_energy)[self.get_energy_sorted_idxs()]
+
+        try:
+            lower_idx = np.where(energy_sorted_energy < lower_bound)[0].max()
+        except ValueError:
+            # this exception is thrown if the boolean condition returns an
+            # empty array
+            lower_idx = None
+
+        try:
+            upper_idx = np.where(energy_sorted_energy > upper_bound)[0].min()
+        except ValueError:
+            upper_idx = None
+
+        return lower_idx, upper_idx
 
 
 class Template:

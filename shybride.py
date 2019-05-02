@@ -334,6 +334,10 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         """
         # plot first spike fitted on template
         self._current_spike = 0
+
+        self._energy_LB, self._energy_UB =\
+            self.spikeTrain.get_automatic_energy_bounds()
+
         self.render_current_spike()
 
         # activate and set slider
@@ -375,7 +379,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.plot_energy()
 
         # sort using fitting energy
-        spike_time = self.spikeTrain.retrieve_energy_sorted_spike_time(self._current_spike)
+        spike_time = self.spikeTrain.get_energy_sorted_spike_time(self._current_spike)
         start, end = self.spikeTrain.get_spike_start_end(spike_time)
         spike = self.recording.get_good_chunk(start,end)
 
@@ -564,37 +568,37 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             # subtract train: all spikes are removed, so not only the onces within
             # the bounds
             self.spikeTrain.subtract_train()
-    
+
             # re-insert the shifted template for the selected energy interval
             sorted_idxs = self.spikeTrain.get_energy_sorted_idxs().copy()
-            sorted_spikes = self.spikeTrain.retrieve_energy_sorted_spikes().copy()
-    
+            sorted_spikes = self.spikeTrain.get_energy_sorted_spikes().copy()
+
             if self._energy_LB is None:
                 l_idx = None
             else:
                 l_idx = self._energy_LB+1 # exclusive
-    
+
             if self._energy_UB is None:
                 u_idx = None
             else:
                 u_idx = self._energy_UB # also exclusive, but handled by python
-    
+
             sorted_spikes_slice = sorted_spikes[l_idx:u_idx]
             sorted_idxs = sorted_idxs[l_idx:u_idx]
-    
+
             assert(sorted_spikes_slice.shape == sorted_idxs.shape)
-    
+
             print('# {} spikes considered for migration'.format(int(sorted_spikes_slice.size)))
-    
+
             # add fixed temporal offset to avoid residual correlation
             time_shift = int(2*self._window_samples)
             sorted_spikes_insert = sorted_spikes_slice + time_shift
-    
+
             # insertion shifted template
             sorted_template_fit = self.spikeTrain._template_fitting[sorted_idxs]
-    
+
             assert(sorted_spikes_slice.shape == sorted_template_fit.shape)
-    
+
             inserted_spikes = self.spikeTrain.insert_given_train(sorted_spikes_insert,
                                                                  self.spikeTrain.template.shifted_template,
                                                                  sorted_template_fit)
@@ -610,15 +614,15 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self.disable_GUI()
             self.spikeTrain.fit_spikes()        
             self.enable_GUI()
-    
+
             self.reset_energy_bounds()
-    
+
             # enable export
             self.btnExport.setEnabled(True)
-    
+
             self.radioTemplate.setChecked(True)
             self.draw_template(calcTemp=False)
-    
+
             # repaint choice in cluster list
             idx = self.listClusterSelect.findText(str(int(self._current_cluster)))
             self.listClusterSelect.model().item(idx).setForeground(QtCore.Qt.gray)
