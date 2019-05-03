@@ -194,14 +194,14 @@ class SpikeTrain:
         return self.spikes[self.get_energy_sorted_idxs()]
 
     def get_automatic_energy_bounds(self, C=0.75):
-        """ Return the lower and upper index obtained from applying robust
-        statistics.
+        """ Return the lower and upper index obtained from robust
+        statistics estimated on the logarithm of the fitting energy.
 
         Parameters
         ----------
         C (float) : Factor that determines the width of the interval that is
         considered. The default value is a safe conservative choice, that will
-        lead to good spikes not reinserted during hybridization.
+        lead to good spikes not being reinserted during hybridization.
 
         Returns
         -------
@@ -238,6 +238,28 @@ class SpikeTrain:
 
         return lower_idx, upper_idx
 
+    def get_automatic_move(self):
+        """ Return random template move along y-axis
+
+        Returns
+        -------
+        move (int) : number of moves along the y-axis
+        """
+        max_channel = self.template.get_max_channel_idx()
+
+        probe = self.recording.probe
+        max_channel_input_space = probe.channels[max_channel]
+        max_channel_geo = probe.geometry[max_channel_input_space]
+
+        nb_positions = (probe.y_max - probe.y_min) / probe.y_between + 1
+        current_position = (max_channel_geo[1] - probe.y_min) / probe.y_between
+
+        random_shift = current_position
+
+        while random_shift == current_position:
+            random_shift = np.random.randint(0, nb_positions)
+
+        return random_shift - current_position
 
 class Template:
     """ Template class
@@ -481,3 +503,15 @@ class Template:
             return template_fit * self.data
         else:
             return template_fit * self.data + residual_fit * self.PC
+
+    def get_max_channel_idx(self):
+        """ Return the index of the maximum peak energy channel in the good
+        channels space (i.e., the space obtained from slicing the the original
+        data with the given channels array in the probe file).
+
+        Returns
+        -------
+        channel_idx (int) : index indication the channel with the highest
+        template peak energy
+        """
+        return np.argmax(np.max(np.abs(self.data), axis=1))

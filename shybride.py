@@ -8,6 +8,7 @@ Created on Fri Sep 28 13:36:01 2018
 
 import sys
 import os
+import time
 
 import yaml
 from PyQt5 import QtWidgets, QtCore
@@ -47,6 +48,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.btnDataSelect.clicked.connect(self.select_data)
         self.listClusterSelect.activated.connect(self.select_cluster)
         self.btnDraw.clicked.connect(lambda: self.draw_template(calcTemp=True))
+        self.btnMagic.clicked.connect(self.magic)
         self.zeroForceFraction.valueChanged.connect(lambda: self.draw_template(calcTemp=True))
         # don't recalculate template
         self.radioTemplate.clicked.connect(lambda: self.draw_template(calcTemp=False))
@@ -231,15 +233,9 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self._current_cluster = int(label)
             self.btnDraw.setEnabled(True)
 
-
-    """
-    Methods related to the template only view
-    """
-
-    def draw_template(self, calcTemp=True, template=None):
-        """ (Calculate and) draw template
+    def is_window_size_valid(self):
+        """ validate the window size
         """
-        # check if given window converts to a float
         try:
             float(self.fieldWindowSize.text())
             window_is_float = True
@@ -250,10 +246,56 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         if self.fieldWindowSize.text() == '':
              QtWidgets.QMessageBox.critical(self, 'No window size',
                                             'Please provide the desired spike window size.')
+             return False
+
         elif not window_is_float:
              QtWidgets.QMessageBox.critical(self, 'Invalid window size',
                                             'Please provide a valid spike window size.')
-        else:
+             return False
+
+        return True
+
+    def magic(self):
+        """ Automatically generate ground truth
+        """
+        if self.is_window_size_valid():
+            clusters = self.clusters.keys()
+            for cluster in clusters:
+                self._current_cluster = cluster
+
+                self.draw_template()
+
+                self.radioTemplate.setChecked(True)
+                QtWidgets.QApplication.processEvents()
+                time.sleep(1)
+
+                self._energy_LB, self._energy_UB =\
+                    self.spikeTrain.get_automatic_energy_bounds()
+
+                self.x_shift = 0
+                self.y_shift = self.spikeTrain.get_automatic_move()
+
+                self.render_shifted_template()
+
+                self.radioMove.setChecked(True)
+                QtWidgets.QApplication.processEvents()
+                time.sleep(1)
+
+                self.execute_move()
+
+                QtWidgets.QApplication.processEvents()
+                time.sleep(1)
+
+                print('magic', cluster)
+
+    """
+    Methods related to the template only view
+    """
+    def draw_template(self, calcTemp=True, template=None):
+        """ (Calculate and) draw template
+        """
+        # if no given window size or invalid window size, raise error message
+        if self.is_window_size_valid():
             if calcTemp and template is None:
                 self.disable_GUI()
 
@@ -334,9 +376,6 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         """
         # plot first spike fitted on template
         self._current_spike = 0
-
-        self._energy_LB, self._energy_UB =\
-            self.spikeTrain.get_automatic_energy_bounds()
 
         self.render_current_spike()
 
@@ -564,6 +603,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
     def execute_move(self):
         """ Move shifted template in the data
         """
+        # check if regular or input mode
         if self.radioFit.isEnabled():
             # subtract train: all spikes are removed, so not only the onces within
             # the bounds
@@ -1120,6 +1160,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         """ Reset GUI to initial enabled state
         """
         self.btnDraw.setEnabled(False)
+        self.btnMagic.setEnabled(True)
 
         self.radioTemplate.setChecked(True)
         self.radioTemplate.setEnabled(False)
@@ -1178,6 +1219,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.GUI_status['btnTemplateImport'] = self.btnTemplateImport.isEnabled()
         self.GUI_status['btnTemplateExport'] = self.btnTemplateExport.isEnabled()
         self.GUI_status['zeroForceFraction'] = self.zeroForceFraction.isEnabled()
+        self.GUI_status['btnMagic'] = self.btnMagic.isEnabled()
 
     def disable_GUI(self):
         """ Disable GUI
@@ -1216,6 +1258,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self.btnTemplateImport.setEnabled(False)
             self.btnTemplateExport.setEnabled(False)
             self.zeroForceFraction.setEnabled(False)
+            self.btnMagic.setEnabled(False)
 
             # force repainting of entire GUI
             self.repaint()
@@ -1246,6 +1289,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.btnTemplateImport.setEnabled(self.GUI_status['btnTemplateImport'])
         self.btnTemplateExport.setEnabled(self.GUI_status['btnTemplateExport'])
         self.zeroForceFraction.setEnabled(self.GUI_status['zeroForceFraction'])
+        self.btnMagic.setEnabled(self.GUI_status['btnMagic'])
 
         self.GUI_enabled = True
 
