@@ -12,6 +12,8 @@ import time
 
 import yaml
 from PyQt5 import QtWidgets, QtCore
+from PyQt5.QtCore import QThread, pyqtSignal
+
 import numpy as np
 
 import matplotlib.cm as cm
@@ -123,6 +125,18 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.axes_color.set_facecolor(bg_color)
         self.colorBar.addWidget(canvas_color)
 
+        # setup worker threads
+        self.templateWorker = TemplateWorker()
+        self.templateWorker.template_ready.connect(lambda spike_train: self.draw_template(calcTemp=False, spike_train=spike_train))
+
+        self.activationWorker = ActivationWorker()
+        self.activationWorker.activation_ready.connect(lambda act, sig_pow : self.render_shifted_template(activations=act, sig_power=sig_pow))
+
+        self.moveWorker = MoveWorker()
+        self.moveWorker.move_ready.connect(self.move_finished)
+
+        # magic function event loop
+        self.magicLoop = QtCore.QEventLoop()
 
     """
     Methods related to data loading and cluster selection
@@ -264,10 +278,9 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                 self._current_cluster = cluster
 
                 self.draw_template()
-
                 self.radioTemplate.setChecked(True)
-                QtWidgets.QApplication.processEvents()
-                time.sleep(1)
+                # wait for multithreaded work to finish
+                self.magicLoop.exec()
 
                 self._energy_LB, self._energy_UB =\
                     self.spikeTrain.get_automatic_energy_bounds()
@@ -276,28 +289,26 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                 self.y_shift = self.spikeTrain.get_automatic_move()
 
                 self.render_shifted_template()
-
                 self.radioMove.setChecked(True)
-                QtWidgets.QApplication.processEvents()
-                time.sleep(1)
+                # wait for multithreaded work to finish
+                if self.activations is None:
+                    self.magicLoop.exec()
 
                 self.execute_move()
-
-                QtWidgets.QApplication.processEvents()
-                time.sleep(1)
+                self.magicLoop.exec()
 
                 print('magic', cluster)
 
     """
     Methods related to the template only view
     """
-    def draw_template(self, calcTemp=True, template=None):
+    def draw_template(self, calcTemp=True, template=None, spike_train=None):
         """ (Calculate and) draw template
         """
         # if no given window size or invalid window size, raise error message
         if self.is_window_size_valid():
             if calcTemp and template is None:
-                self.disable_GUI()
+                self.disable_GUI(msg='estimating template')
 
                 if self._current_cluster in self.generated_GT.keys():
                     spike_times = self.generated_GT[self._current_cluster]
@@ -308,12 +319,20 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
                 # calculate template
                 self._window_samples = int(np.ceil(float(self.fieldWindowSize.text()) / 1000 * self.recording.sampling_rate))
-                self.spikeTrain.calculate_template(window_size=self._window_samples,
-                                                   zf_frac=(self.zeroForceFraction.value() / 100))
+                zf_frac = self.zeroForceFraction.value() / 100
 
-                # init fit factors
-                self.spikeTrain.fit_spikes()
+                self.templateWorker.spike_train = self.spikeTrain
+                self.templateWorker.window_size = self._window_samples
+                self.templateWorker.zf_frac = zf_frac
 
+                self.templateWorker.start()
+
+                # return and wait for worker thread to finish
+                return
+
+            elif spike_train is not None:
+                # finish multi threaded job
+                self.spikeTrain = spike_train
                 self.reset_energy_bounds()
 
                 self.enable_GUI()
@@ -359,6 +378,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
             self.set_template_fit_enabled(False)
             self.set_move_template_enabled(False)
+
+            self.magicLoop.exit()
 
     def set_display_template_enabled(self, enabled):
         """ Enable or disable the display template part of the GUI
@@ -541,7 +562,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         if not enabled:
             self.show_color_bar(False)
 
-    def render_shifted_template(self):
+    def render_shifted_template(self, activations=None, sig_power=None):
         """ Calculate and render the shifted template
         """
         self.clear_canvas()
@@ -550,17 +571,22 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                                                             self.x_shift,
                                                             self.y_shift)
 
-        if self.activations is None:
-            self.disable_GUI()
-            self.activations = self.recording.count_spikes(C=6).astype(np.float)
-
-            # clip activations for visual purposes
-            pct = np.percentile(self.activations, 90)
-            self.activations[self.activations > pct] = pct
-
-            self.sig_power = self.recording.get_signal_power()
+        # act on worker thread results
+        if activations is not None:
+            self.activations = activations
+            self.sig_power = sig_power
 
             self.enable_GUI()
+            self.magicLoop.exit()
+
+        if self.activations is None:
+            self.disable_GUI(msg='calculating spiking activity')
+
+            self.activationWorker.recording = self.recording
+            self.activationWorker.start()
+
+            # return and wait for thread to finish
+            return
 
         if self.checkHeatMap.isChecked():
             norm_activations = self.activations / self.activations.max()
@@ -605,72 +631,40 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         """
         # check if regular or input mode
         if self.radioFit.isEnabled():
-            # subtract train: all spikes are removed, so not only the onces within
-            # the bounds
-            self.spikeTrain.subtract_train()
+            self.disable_GUI(msg='moving template')
 
-            # re-insert the shifted template for the selected energy interval
-            sorted_idxs = self.spikeTrain.get_energy_sorted_idxs().copy()
-            sorted_spikes = self.spikeTrain.get_energy_sorted_spikes().copy()
+            self.moveWorker.spike_train = self.spikeTrain
+            self.moveWorker.generated_GT = self.generated_GT
 
-            if self._energy_LB is None:
-                l_idx = None
-            else:
-                l_idx = self._energy_LB+1 # exclusive
+            self.moveWorker.current_cluster = self._current_cluster
+            self.moveWorker.energy_LB = self._energy_LB
+            self.moveWorker.energy_UB = self._energy_UB
+            self.moveWorker.window_size = self._window_samples
 
-            if self._energy_UB is None:
-                u_idx = None
-            else:
-                u_idx = self._energy_UB # also exclusive, but handled by python
-
-            sorted_spikes_slice = sorted_spikes[l_idx:u_idx]
-            sorted_idxs = sorted_idxs[l_idx:u_idx]
-
-            assert(sorted_spikes_slice.shape == sorted_idxs.shape)
-
-            print('# {} spikes considered for migration'.format(int(sorted_spikes_slice.size)))
-
-            # add fixed temporal offset to avoid residual correlation
-            time_shift = int(2*self._window_samples)
-            sorted_spikes_insert = sorted_spikes_slice + time_shift
-
-            # insertion shifted template
-            sorted_template_fit = self.spikeTrain._template_fitting[sorted_idxs]
-
-            assert(sorted_spikes_slice.shape == sorted_template_fit.shape)
-
-            inserted_spikes = self.spikeTrain.insert_given_train(sorted_spikes_insert,
-                                                                 self.spikeTrain.template.shifted_template,
-                                                                 sorted_template_fit)
-
-            self.spikeTrain.update(inserted_spikes)
-
-            print('# {} spikes migrated'.format(int(inserted_spikes.size)))
-
-            self.generated_GT[self._current_cluster] = inserted_spikes
-
-            # keep track
-            # TODO remove duplication
-            self.disable_GUI()
-            self.spikeTrain.fit_spikes()        
-            self.enable_GUI()
-
-            self.reset_energy_bounds()
-
-            # enable export
-            self.btnExport.setEnabled(True)
-
-            self.radioTemplate.setChecked(True)
-            self.draw_template(calcTemp=False)
-
-            # repaint choice in cluster list
-            idx = self.listClusterSelect.findText(str(int(self._current_cluster)))
-            self.listClusterSelect.model().item(idx).setForeground(QtCore.Qt.gray)
+            self.moveWorker.start()
+            return
 
         else:
             # insert template
             self.build_insert_dialog()
 
+    def move_finished(self, spike_train, generated_GT):
+        self.spikeTrain = spike_train
+        self.generated_GT = generated_GT
+
+        self.reset_energy_bounds()
+
+        self.btnExport.setEnabled(True)
+
+        self.radioTemplate.setChecked(True)
+        self.draw_template(calcTemp=False)
+
+        # repaint choice in cluster list
+        idx = self.listClusterSelect.findText(str(int(self._current_cluster)))
+        self.listClusterSelect.model().item(idx).setForeground(QtCore.Qt.gray)
+
+        self.enable_GUI()
+        self.magicLoop.exit()
 
     """
     Methods related to exporting data
@@ -936,6 +930,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         # repaint choice in cluster list
         idx = self.listClusterSelect.findText(str(int(self._current_cluster)))
         self.listClusterSelect.model().item(idx).setForeground(QtCore.Qt.gray)
+
 
     """
     Methods related to plotting on the GUI canvas
@@ -1220,13 +1215,20 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.GUI_status['btnTemplateExport'] = self.btnTemplateExport.isEnabled()
         self.GUI_status['zeroForceFraction'] = self.zeroForceFraction.isEnabled()
         self.GUI_status['btnMagic'] = self.btnMagic.isEnabled()
+        self.GUI_status['zeroForceLabel'] = self.zeroForceLabel.isEnabled()
 
-    def disable_GUI(self):
+    def disable_GUI(self, msg=None):
         """ Disable GUI
         """
         if self.GUI_enabled:
             # prevent losing status dict
             self.GUI_enabled = False
+
+            self.progressBar.setMaximum(0)
+            self.progressBar.setEnabled(True)
+
+            if msg is not None:
+                self.progressLabel.setText(msg)
 
             # build dict
             self.build_GUI_status_dict()
@@ -1259,6 +1261,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self.btnTemplateExport.setEnabled(False)
             self.zeroForceFraction.setEnabled(False)
             self.btnMagic.setEnabled(False)
+            self.zeroForceLabel.setEnabled(False)
 
             # force repainting of entire GUI
             self.repaint()
@@ -1290,8 +1293,108 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.btnTemplateExport.setEnabled(self.GUI_status['btnTemplateExport'])
         self.zeroForceFraction.setEnabled(self.GUI_status['zeroForceFraction'])
         self.btnMagic.setEnabled(self.GUI_status['btnMagic'])
+        self.zeroForceLabel.setEnabled(self.GUI_status['zeroForceLabel'])
+
+        self.progressBar.setMaximum(1)
+        self.progressBar.setEnabled(False)
+        self.progressLabel.setText('')
 
         self.GUI_enabled = True
+
+
+class TemplateWorker(QThread):
+    template_ready = pyqtSignal(SpikeTrain)
+
+    def __init__(self):
+        QThread.__init__(self)
+
+    def run(self):
+        # calculate template
+        self.spike_train.calculate_template(window_size=self.window_size,
+                                           zf_frac=self.zf_frac)
+        # calculate fit factors
+        self.spike_train.fit_spikes()
+
+        self.template_ready.emit(self.spike_train)
+
+
+class ActivationWorker(QThread):
+    activation_ready = pyqtSignal(np.ndarray, float)
+
+    def __init__(self):
+        QThread.__init__(self)
+
+    def run(self):
+        activations = self.recording.count_spikes(C=6).astype(np.float)
+        # clip activations for visual purposes
+        pct = np.percentile(activations, 90)
+        activations[activations > pct] = pct
+
+        # TODO move to own worker?
+        sig_power = self.recording.get_signal_power()
+
+        self.activation_ready.emit(activations, sig_power)
+
+# TODO add reinsert worker
+class MoveWorker(QThread):
+    move_ready = pyqtSignal(SpikeTrain, SpikeClusters)
+
+    def __init__(self):
+        QThread.__init__(self)
+
+        self.spike_train = None
+        self.generated_GT = None
+
+        self.current_cluster = None
+        self.energy_LB = None
+        self.energy_UB = None
+        self.window_size = None
+
+    def run(self):
+        self.spike_train.subtract_train()
+
+        # re-insert the shifted template for the selected energy interval
+        sorted_idxs = self.spike_train.get_energy_sorted_idxs().copy()
+        sorted_spikes = self.spike_train.get_energy_sorted_spikes().copy()
+
+        if self.energy_LB is None:
+            l_idx = None
+        else:
+            l_idx = self.energy_LB+1 # exclusive
+
+        if self.energy_UB is None:
+            u_idx = None
+        else:
+            u_idx = self.energy_UB # also exclusive, but handled by python
+
+        sorted_spikes_slice = sorted_spikes[l_idx:u_idx]
+        sorted_idxs = sorted_idxs[l_idx:u_idx]
+
+        assert(sorted_spikes_slice.shape == sorted_idxs.shape)
+
+        print('# {} spikes considered for migration'.format(int(sorted_spikes_slice.size)))
+
+        # add fixed temporal offset to avoid residual correlation
+        time_shift = int(2*self.window_size)
+        sorted_spikes_insert = sorted_spikes_slice + time_shift
+
+        # insertion shifted template
+        sorted_template_fit = self.spike_train._template_fitting[sorted_idxs]
+
+        assert(sorted_spikes_slice.shape == sorted_template_fit.shape)
+
+        inserted_spikes = self.spike_train.insert_given_train(sorted_spikes_insert,
+                                                             self.spike_train.template.shifted_template,
+                                                             sorted_template_fit)
+
+        self.spike_train.update(inserted_spikes)
+        self.spike_train.fit_spikes() 
+
+        self.generated_GT[self.current_cluster] = inserted_spikes
+
+        print('# {} spikes migrated'.format(int(inserted_spikes.size)))
+
+        self.move_ready.emit(self.spike_train, self.generated_GT)
 
 
 def main():
@@ -1302,16 +1405,6 @@ def main():
     # classic style
     form = Pybridizer()
     form.show()
-
-#    # dark style
-#    qt_styles.dark(app)
-#    mw = qt_windows.ModernWindow(form)
-#    mw.show()
-
-#    # use timer to run init routine
-#    timer = QtCore.QTimer()
-#    timer.timeout.connect(form.init_colorbar)
-#    timer.start(10)
 
     app.exec_()
 
