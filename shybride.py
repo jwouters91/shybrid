@@ -553,6 +553,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
     def set_move_template_enabled(self, enabled):
         """ Enable/disable move template GUI elements
         """
+        print('set move template {}'.format(enabled))
         self.btnMoveLeft.setEnabled(enabled)
         self.btnMoveUp.setEnabled(enabled)
         self.btnMoveRight.setEnabled(enabled)
@@ -659,16 +660,14 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
         self.reset_energy_bounds()
 
-#        self.btnExport.setEnabled(True)
-
-        self.radioTemplate.setChecked(True)
-        self.draw_template(calcTemp=False)
-
         # repaint choice in cluster list
         idx = self.listClusterSelect.findText(str(int(self._current_cluster)))
         self.listClusterSelect.model().item(idx).setForeground(QtCore.Qt.gray)
 
         self.enable_GUI()
+
+        self.draw_template(calcTemp=False)
+
         self.magicLoop.exit()
 
 
