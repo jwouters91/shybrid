@@ -67,7 +67,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.checkBoxLower.clicked.connect(lambda: self.set_energy_lb(draw=True))
         self.checkBoxUpper.clicked.connect(lambda: self.set_energy_ub(draw=True))
         self.btnMove.clicked.connect(self.execute_move)
-        self.btnExport.clicked.connect(self.export_data)
+#        self.btnExport.clicked.connect(self.export_data)
         self.checkHeatMap.clicked.connect(self.toggle_heat_map)
 
         self.btnResetZoom.clicked.connect(self.reset_view_plot)
@@ -138,6 +138,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         # magic function event loop
         self.magicLoop = QtCore.QEventLoop()
 
+
     """
     Methods related to data loading and cluster selection
     """
@@ -145,6 +146,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
     def select_data(self):
         """ Open the selected data and load recording and clusters
         """
+        QtWidgets.QMessageBox.information(self, 'data warning', 'This tool will alter the provided data directly. Make sure to keep a copy of your original recording data.')
+
         raw_fn, _ = QtWidgets.QFileDialog.\
             getOpenFileName(self,
                             'select raw recording',
@@ -633,6 +636,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         if self.radioFit.isEnabled():
             self.disable_GUI(msg='moving template')
 
+            self.moveWorker.recording = self.recording
             self.moveWorker.spike_train = self.spikeTrain
             self.moveWorker.generated_GT = self.generated_GT
 
@@ -640,6 +644,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self.moveWorker.energy_LB = self._energy_LB
             self.moveWorker.energy_UB = self._energy_UB
             self.moveWorker.window_size = self._window_samples
+            self.moveWorker.dump_path = self._select_path
 
             self.moveWorker.start()
             return
@@ -654,7 +659,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
         self.reset_energy_bounds()
 
-        self.btnExport.setEnabled(True)
+#        self.btnExport.setEnabled(True)
 
         self.radioTemplate.setChecked(True)
         self.draw_template(calcTemp=False)
@@ -665,31 +670,6 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
         self.enable_GUI()
         self.magicLoop.exit()
-
-    """
-    Methods related to exporting data
-    """
-
-    def export_data(self):
-        """ Export data
-        """
-        export_path, _ = \
-            QtWidgets.QFileDialog.getSaveFileName(self,
-                                                  'save hybrid recording',
-                                                  directory=self._select_path,
-                                                  filter='raw recording (*.raw *.bin *.dat)')
-
-        if export_path != '':
-            # generate GT path
-            csv_path, _ = os.path.splitext(export_path)
-            csv_path = '{}_GT.csv'.format(csv_path)
-
-            self.disable_GUI()
-            print('# exporting {}'.format(export_path))
-            self.recording.save_raw(export_path)
-            print('# exporting {}'.format(csv_path))
-            self.generated_GT.dumpCSV(csv_path)
-            self.enable_GUI()
 
 
     """
@@ -922,7 +902,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.reset_energy_bounds()
 
         # enable export
-        self.btnExport.setEnabled(True)
+#        self.btnExport.setEnabled(True)
 
         self.radioTemplate.setChecked(True)
         self.draw_template(calcTemp=False)
@@ -1166,7 +1146,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.set_template_fit_enabled(False)
         self.set_move_template_enabled(False)
 
-        self.btnExport.setEnabled(False)
+#        self.btnExport.setEnabled(False)
         self.btnTemplateExport.setEnabled(False)
         self.btnTemplateImport.setEnabled(data_loaded)
 
@@ -1202,7 +1182,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.GUI_status['btnMoveRight'] = self.btnMoveRight.isEnabled()
         self.GUI_status['btnMoveDown'] = self.btnMoveDown.isEnabled()
         self.GUI_status['btnReset'] = self.btnReset.isEnabled()
-        self.GUI_status['btnExport'] = self.btnExport.isEnabled()
+#        self.GUI_status['btnExport'] = self.btnExport.isEnabled()
         self.GUI_status['horizontalSlider'] = self.horizontalSlider.isEnabled()
         self.GUI_status['checkBoxLower'] = self.checkBoxLower.isEnabled()
         self.GUI_status['checkBoxUpper'] = self.checkBoxUpper.isEnabled()
@@ -1248,7 +1228,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self.btnMoveRight.setEnabled(False)
             self.btnMoveDown.setEnabled(False)
             self.btnReset.setEnabled(False)
-            self.btnExport.setEnabled(False)
+#            self.btnExport.setEnabled(False)
             self.horizontalSlider.setEnabled(False)
             self.checkBoxLower.setEnabled(False)
             self.checkBoxUpper.setEnabled(False)
@@ -1283,7 +1263,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.btnMoveRight.setEnabled(self.GUI_status['btnMoveRight'])
         self.btnMoveDown.setEnabled(self.GUI_status['btnMoveDown'])
         self.btnReset.setEnabled(self.GUI_status['btnReset'])
-        self.btnExport.setEnabled(self.GUI_status['btnExport'])
+#        self.btnExport.setEnabled(self.GUI_status['btnExport'])
         self.horizontalSlider.setEnabled(self.GUI_status['horizontalSlider'])
         self.btnResetZoom.setEnabled(self.GUI_status['btnResetZoom'])
         self.btnZoom.setEnabled(self.GUI_status['btnZoom'])
@@ -1342,6 +1322,7 @@ class MoveWorker(QThread):
     def __init__(self):
         QThread.__init__(self)
 
+        self.recording = None
         self.spike_train = None
         self.generated_GT = None
 
@@ -1349,6 +1330,7 @@ class MoveWorker(QThread):
         self.energy_LB = None
         self.energy_UB = None
         self.window_size = None
+        self.dump_path = None
 
     def run(self):
         self.spike_train.subtract_train()
@@ -1394,7 +1376,17 @@ class MoveWorker(QThread):
 
         print('# {} spikes migrated'.format(int(inserted_spikes.size)))
 
+        self.flush()
+
         self.move_ready.emit(self.spike_train, self.generated_GT)
+
+    def flush(self):
+        """ Flush recording and update GT
+        """
+        csv_path = os.path.join(self.dump_path, 'hybrid_GT.csv')
+        self.recording.flush()
+        print('# updated ground truth in {}'.format(csv_path))
+        self.generated_GT.dumpCSV(csv_path)
 
 
 def main():

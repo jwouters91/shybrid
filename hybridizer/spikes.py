@@ -297,9 +297,11 @@ class Template:
 
         self.data = np.median(spike_tensor, axis=0)
 
-        # set every channel to zero that has less than 1% of max channel energy
+        # set every channel to zero that has less than (zf*100)% of max channel energy
         if force_zero:
-            energy = self.data**2
+            # remove DC form template to calculate the energy
+            DC_corrected_temp = self.data - self.data.mean(axis=1)[:,np.newaxis]
+            energy = DC_corrected_temp**2
             energy = np.sum(energy, axis=1)
             self.data[energy<zf_frac*energy.max(),:] = 0
 

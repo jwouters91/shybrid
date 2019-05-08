@@ -50,7 +50,7 @@ class Recording:
     supported_dtypes = ('float32', 'float64', 'double', 'int16', 'int32')
 
     def __init__(self, fn, probe_fn, sampling_rate, dtype,
-                 mode='c', order='C'):
+                 mode='r+', order='C'):
         # check if the given datatype is supported
         if dtype not in self.supported_dtypes:
             raise TypeError('The given data type ({}) is not supported. '
