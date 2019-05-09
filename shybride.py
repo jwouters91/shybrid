@@ -3,16 +3,13 @@
 """
 Created on Fri Sep 28 13:36:01 2018
 
-@author: jwouters
+@author: Jasper Wouters
 """
-
 import sys
 import os
-import time
-
 import yaml
+
 from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtCore import QThread, pyqtSignal
 
 import numpy as np
 
@@ -25,50 +22,63 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 from hybridizer.ui import design, import_template, insert_template
 from hybridizer.io import Recording, SpikeClusters, Phy, RectangularProbe
 from hybridizer.spikes import SpikeTrain
+from hybridizer.threads import TemplateWorker, ActivationWorker, MoveWorker
 
-CHOOSE_CLUSTER = 'select cluster'
-TEMPLATE_COLOR = '#1F77B4'
-SPIKE_COLOR = 'salmon'
-MOVE_COLOR = '#1F77B4'
-ENERGY_COLOR = 'salmon'
-INACTIVE_COLOR = 'gray'
-FLAT_COLOR = 'lightgray'
-MARKER_COLOR = 'darkslategray'
-COLOR_MAP = 'winter' # rainbow
 
-class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
+class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
+    """ Spike HYBRIDizer for Extracellular recordings
+    """
+    # Application constants
+    CHOOSE_CLUSTER = 'select cluster'
+
+    TEMPLATE_COLOR = '#1F77B4'
+    SPIKE_COLOR = 'salmon'
+    ENERGY_COLOR = 'salmon'
+    INACTIVE_COLOR = 'gray'
+    FLAT_COLOR = 'lightgray'
+    MARKER_COLOR = 'darkslategray'
+    COLOR_MAP = 'winter'
+
     def __init__(self, parent=None):
-        # setup main UI
+        # setup UI
         super(self.__class__, self).__init__(parent)
         self.setupUi(self)
 
-        # helper variables
-        self._select_path = os.path.expanduser('~')
-        self.GUI_enabled = True
+        self.init_variables()
+        self.connect_listeners()
 
-        # connect listeners
+        # create plotting widgets
+        self.create_plotting_area()
+        self.create_color_bar()
+
+        self.init_multi_threading()
+
+    def connect_listeners(self):
+        """ Connect listener functions to GUI signals
+        """
         self.btnDataSelect.clicked.connect(self.select_data)
         self.listClusterSelect.activated.connect(self.select_cluster)
         self.btnDraw.clicked.connect(lambda: self.draw_template(calcTemp=True))
-        self.btnMagic.clicked.connect(self.magic)
-        self.zeroForceFraction.valueChanged.connect(lambda: self.draw_template(calcTemp=True))
-        # don't recalculate template
+        self.btnMagic.clicked.connect(self.auto_hybrid)
+
         self.radioTemplate.clicked.connect(lambda: self.draw_template(calcTemp=False))
+        self.zeroForceFraction.valueChanged.connect(lambda: self.draw_template(calcTemp=True))
+
         self.radioFit.clicked.connect(self.template_fit)
         self.btnLeftSpike.clicked.connect(self.lower_spike)
+        self.checkBoxLower.clicked.connect(lambda: self.set_energy_lb(draw=True))
+        self.checkBoxUpper.clicked.connect(lambda: self.set_energy_ub(draw=True))
         self.btnRightSpike.clicked.connect(self.increase_spike)
         self.horizontalSlider.valueChanged.connect(self.slide_spike)
+
         self.radioMove.clicked.connect(self.move_template)
         self.btnMoveLeft.clicked.connect(self.move_left)
         self.btnMoveRight.clicked.connect(self.move_right)
         self.btnMoveUp.clicked.connect(self.move_up)
         self.btnMoveDown.clicked.connect(self.move_down)
         self.btnReset.clicked.connect(self.move_template)
-        self.checkBoxLower.clicked.connect(lambda: self.set_energy_lb(draw=True))
-        self.checkBoxUpper.clicked.connect(lambda: self.set_energy_ub(draw=True))
-        self.btnMove.clicked.connect(self.execute_move)
-#        self.btnExport.clicked.connect(self.export_data)
         self.checkHeatMap.clicked.connect(self.toggle_heat_map)
+        self.btnMove.clicked.connect(self.execute_move)
 
         self.btnResetZoom.clicked.connect(self.reset_view_plot)
         self.btnZoom.clicked.connect(self.zoom_plot)
@@ -77,15 +87,19 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.btnTemplateExport.clicked.connect(self.export_template)
         self.btnTemplateImport.clicked.connect(self.import_template)
 
+    def create_plotting_area(self):
+        """ create and set up main plotting area
+        """
+        # activate toggle mode on zoom and pan button
         self.btnZoom.setCheckable(True)
         self.btnPan.setCheckable(True)
 
-        """ set up main plotting area
-        """
+        # create plotting canvas
         canvas = FigureCanvas(plt.figure())
         self.toolbar = NavigationToolbar(canvas, self)
         self.toolbar.hide()
 
+        # set up
         self.axes = canvas.figure.add_subplot(111)
         self.axes.spines['top'].set_visible(False)
         self.axes.spines['right'].set_visible(False)
@@ -100,10 +114,11 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                                            QtWidgets.QSizePolicy.Expanding)
         canvas.setSizePolicy(sizePolicy)
 
-        # add canvas widget to GUI
+        # add canvas widget to UI
         self.plotCanvas.addWidget(canvas)
 
-        """ set up color bar plotting area
+    def create_color_bar(self):
+        """ Create and set up color bar plotting area
         """
         canvas_color = FigureCanvas(plt.figure(figsize=(0,0.2)))
 
@@ -125,29 +140,46 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.axes_color.set_facecolor(bg_color)
         self.colorBar.addWidget(canvas_color)
 
-        # setup worker threads
+    def init_multi_threading(self):
+        """ Initialize multi threading workers
+        """
         self.templateWorker = TemplateWorker()
-        self.templateWorker.template_ready.connect(lambda spike_train: self.draw_template(calcTemp=False, spike_train=spike_train))
+        self.templateWorker.template_ready.connect(
+                lambda spike_train: self.draw_template(calcTemp=False,
+                                                       spike_train=spike_train))
 
         self.activationWorker = ActivationWorker()
-        self.activationWorker.activation_ready.connect(lambda act, sig_pow : self.render_shifted_template(activations=act, sig_power=sig_pow))
+        self.activationWorker.activation_ready.connect(
+                lambda act, sig_pow : self.render_shifted_template(activations=act,
+                                                                   sig_power=sig_pow))
 
         self.moveWorker = MoveWorker()
         self.moveWorker.move_ready.connect(self.move_finished)
 
-        # magic function event loop
-        self.magicLoop = QtCore.QEventLoop()
+        # create event loop for use in the automatic hybridization magic
+        self.magicEventLoop = QtCore.QEventLoop()
+
+    def init_variables(self):
+        """ Initialize helper variables
+        """
+        # path that is shown when the user opens a file browser dialog
+        self._select_path = os.path.expanduser('~')
+        # tracks the state of the GUI
+        self.GUI_enabled = True
 
 
     """
     Methods related to data loading and cluster selection
     """
-
     def select_data(self):
         """ Open the selected data and load recording and clusters
         """
-        QtWidgets.QMessageBox.information(self, 'data warning', 'This tool will alter the provided data directly. Make sure to keep a copy of your original recording data.')
+        # show memory mapping related warning message
+        warn_message = 'This tool will alter the provided data directly. '\
+            'Make sure to keep a copy of your original recording data.'
+        QtWidgets.QMessageBox.information(self, 'data warning', warn_message)
 
+        # open file browsing dialog
         raw_fn, _ = QtWidgets.QFileDialog.\
             getOpenFileName(self,
                             'select raw recording',
@@ -158,11 +190,10 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             # update select path for user convenience
             self._select_path, _ = os.path.split(raw_fn)
 
-            # parse config file
+            # try to load paramers file
             config_fn, _ = os.path.splitext(raw_fn)
             config_fn = config_fn + '.yml'
 
-            # assuming that params file is correct (TODO add explicit checks)
             if os.path.isfile(config_fn):
                 # reset/init file related state
                 self.reset_file_session_variables()
@@ -170,43 +201,64 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                 with open(config_fn, 'r') as f:
                     config = yaml.load(f)
 
-                data_conf = config['data']
-                data_clus = config['clusters']
+                # process config parameters
+                rec_params = config['data']
 
                 try:
-                    # initialise program objects
-                    self.recording = Recording(raw_fn, data_conf['probe'],
-                                               data_conf['fs'], data_conf['dtype'],
-                                               order=data_conf['order'])
+                    # initialise recording objects
+                    self.recording = Recording(raw_fn, rec_params['probe'],
+                                               rec_params['fs'],
+                                               rec_params['dtype'],
+                                               order=rec_params['order'])
                 except TypeError as e:
                     # throw message box if provided type is not supported
                     QtWidgets.QMessageBox.critical(self, 'type error', str(e))
 
                     self.reset_GUI_initial(data_loaded=False)
-                    self.listClusterSelect.clear()
-                    self.listClusterSelect.addItems([CHOOSE_CLUSTER])
+                    self.clear_cluster_dropdown()
 
                     return
 
-                # TODO use this more advanced probe class throughout the entire
-                # program
+                except Exception as e:
+                    # throw message box for unexpected errors
+                    QtWidgets.QMessageBox.critical(self, 'unexpected error',
+                                                   str(e))
+
+                    self.reset_GUI_initial(data_loaded=False)
+                    self.clear_cluster_dropdown()
+
+                    return
+
+                # process prior spike sorting results
+                clus_params = config['clusters']
+
+                try:
+                    for clus_mode in clus_params.keys():
+                        # load cluster information from phy
+                        if clus_mode == 'phy':
+                            phy = Phy(clus_params[clus_mode])
+                            self.clusters = SpikeClusters()
+                            self.clusters.fromPhy(phy)
+                        # load cluster information from csv
+                        elif clus_mode == 'csv':
+                            self.clusters = SpikeClusters()
+                            self.clusters.fromCSV(clus_params[clus_mode])
+                except Exception as e:
+                    # throw message box for unexpected errors
+                    QtWidgets.QMessageBox.critical(self, 'unexpected error',
+                                                   str(e))
+
+                    self.reset_GUI_initial(data_loaded=False)
+                    self.clear_cluster_dropdown()
+
+                    return
+
+                self.fill_cluster_dropdown()
+
+                # init probe model used for template import
                 self.connected_probe = RectangularProbe()
                 self.connected_probe.fill_channels(self.recording.probe.geometry)
                 self.connected_probe.connect_channels()
-                self.connected_probe.validate_probe_graph()
-
-                for clus_mode in data_clus.keys():
-                    # load cluster information from phy
-                    if clus_mode == 'phy':
-                        phy = Phy(data_clus[clus_mode])
-                        self.clusters = SpikeClusters()
-                        self.clusters.fromPhy(phy)
-                    # load cluster information from csv
-                    elif clus_mode == 'csv':
-                        self.clusters = SpikeClusters()
-                        self.clusters.fromCSV(data_clus[clus_mode])
-
-                self.fill_cluster_dropdown()
 
                 # init generated GT
                 self.generated_GT = SpikeClusters()
@@ -229,7 +281,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         else:
             self._import_counter = 0
 
-        self.good_clusters = [CHOOSE_CLUSTER] + np.sort(good_clusters).astype('str').tolist()
+        self.good_clusters = [self.CHOOSE_CLUSTER] + np.sort(good_clusters).astype('str').tolist()
 
         self.listClusterSelect.clear()
         self.listClusterSelect.addItems(self.good_clusters)
@@ -237,7 +289,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
     def clear_cluster_dropdown(self):
         """ Clear the cluster dropdown menu
         """
-        self.good_clusters = [CHOOSE_CLUSTER]
+        self.good_clusters = [self.CHOOSE_CLUSTER]
 
         self.listClusterSelect.clear()
         self.listClusterSelect.addItems(self.good_clusters)
@@ -246,7 +298,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         """ Select cluster from dropdown menu
         """
         label = self.listClusterSelect.currentText()
-        if label != CHOOSE_CLUSTER:            
+        if label != self.CHOOSE_CLUSTER:            
             self._current_cluster = int(label)
             self.btnDraw.setEnabled(True)
 
@@ -272,7 +324,10 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
         return True
 
-    def magic(self):
+
+    """ Auto hybrid
+    """
+    def auto_hybrid(self):
         """ Automatically generate ground truth
         """
         if self.is_window_size_valid():
@@ -283,7 +338,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                 self.draw_template()
                 self.radioTemplate.setChecked(True)
                 # wait for multithreaded work to finish
-                self.magicLoop.exec()
+                self.magicEventLoop.exec()
 
                 self._energy_LB, self._energy_UB =\
                     self.spikeTrain.get_automatic_energy_bounds()
@@ -295,12 +350,11 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                 self.radioMove.setChecked(True)
                 # wait for multithreaded work to finish
                 if self.activations is None:
-                    self.magicLoop.exec()
+                    self.magicEventLoop.exec()
 
                 self.execute_move()
-                self.magicLoop.exec()
+                self.magicEventLoop.exec()
 
-                print('magic', cluster)
 
     """
     Methods related to the template only view
@@ -324,6 +378,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                 self._window_samples = int(np.ceil(float(self.fieldWindowSize.text()) / 1000 * self.recording.sampling_rate))
                 zf_frac = self.zeroForceFraction.value() / 100
 
+                # transfer data to worker
                 self.templateWorker.spike_train = self.spikeTrain
                 self.templateWorker.window_size = self._window_samples
                 self.templateWorker.zf_frac = zf_frac
@@ -340,7 +395,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
                 self.enable_GUI()
 
-            elif not template is None:
+            # use provided template instead of data derived one
+            elif template is not None:
                 self.spikeTrain = SpikeTrain(self.recording, np.array([]))
                 # if template is given through import overwrite
                 self.spikeTrain.calculate_template()
@@ -354,7 +410,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self._template_scaling = self.plot_multichannel(self.spikeTrain.template.data)
             self.axes.autoscale(False)
 
-            # clear removes callbacks
+            # add callbacks
             self.axes.callbacks.connect('ylim_changed', self.lim_changed)
             self.axes.callbacks.connect('xlim_changed', self.lim_changed)
 
@@ -370,19 +426,16 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
             self.btnTemplateExport.setEnabled(True)
 
-            # TODO I think this if else clause can be at least partially removed
+            self.radioMove.setEnabled(True) # we opted for eternal program flow
             if self._current_cluster in self.generated_GT.keys():
-                # self.radioMove.setEnabled(False)
-                self.radioMove.setEnabled(True) # we opted for eternal program flow
                 self.plotTitle.setText('Cluster {} [ALREADY MOVED]'.format(self._current_cluster))
             else:
-                self.radioMove.setEnabled(True)
                 self.plotTitle.setText('Cluster {}'.format(self._current_cluster))
 
             self.set_template_fit_enabled(False)
             self.set_move_template_enabled(False)
 
-            self.magicLoop.exit()
+            self.magicEventLoop.exit()
 
     def set_display_template_enabled(self, enabled):
         """ Enable or disable the display template part of the GUI
@@ -391,10 +444,10 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.zeroForceFraction.lineEdit().deselect()
         self.zeroForceLabel.setEnabled(enabled)
 
+
     """ 
     Methods related to the template fit view
     """
-
     def template_fit(self):
         """ Switch to template fit plot
         """
@@ -450,7 +503,8 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         sorted_idxs = self.spikeTrain.get_energy_sorted_idxs()
         fit = self.spikeTrain._template_fitting[sorted_idxs][self._current_spike]
 
-        self.plot_multichannel(spike, color=SPIKE_COLOR, scaling=self._template_scaling/fit)
+        self.plot_multichannel(spike, color=self.SPIKE_COLOR,
+                               scaling=self._template_scaling/fit)
         self.plot_multichannel(self.spikeTrain.template.data)
 
     def lower_spike(self):
@@ -505,7 +559,6 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
     """ 
     Methods related to the move template view
     """
-
     def move_template(self):
         """ Switch to move template mode in GUI
         """
@@ -553,7 +606,6 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
     def set_move_template_enabled(self, enabled):
         """ Enable/disable move template GUI elements
         """
-        print('set move template {}'.format(enabled))
         self.btnMoveLeft.setEnabled(enabled)
         self.btnMoveUp.setEnabled(enabled)
         self.btnMoveRight.setEnabled(enabled)
@@ -581,7 +633,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self.sig_power = sig_power
 
             self.enable_GUI()
-            self.magicLoop.exit()
+            self.magicEventLoop.exit()
 
         if self.activations is None:
             self.disable_GUI(msg='calculating spiking activity')
@@ -599,7 +651,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                                    activations=norm_activations)
         else:
             self.plot_multichannel(self.spikeTrain.template.shifted_template,
-                                   color=MOVE_COLOR,
+                                   color=self.TEMPLATE_COLOR,
                                    scaling=self._template_scaling)
 
         self.show_color_bar(self.checkHeatMap.isChecked())
@@ -617,7 +669,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                 self.labelLow.setText('0')
                 self.labelHigh.setText('{}'.format(int(self.activations.max())))
 
-            cmap = cm.get_cmap(COLOR_MAP)
+            cmap = cm.get_cmap(self.COLOR_MAP)
             mpl.colorbar.ColorbarBase(self.axes_color, cmap=cmap,
                                       orientation='horizontal')
             self.axes_color.figure.canvas.draw()
@@ -668,13 +720,12 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
         self.draw_template(calcTemp=False)
 
-        self.magicLoop.exit()
+        self.magicEventLoop.exit()
 
 
     """
     Methods related to exporting the active template
     """
-
     def export_template(self):
         """ Export template
         """
@@ -821,7 +872,6 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
         self.draw_template(calcTemp=False, template=template)
 
-        # TODO build template object and fit in current workflow
         self.importTemplateContainer.close()
 
     def build_insert_dialog(self):
@@ -892,16 +942,11 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
         self.insertTemplateContainer.close()
 
-        # keep track
-        # TODO remove duplication
         self.disable_GUI()
         self.spikeTrain.fit_spikes()
         self.enable_GUI()
 
         self.reset_energy_bounds()
-
-        # enable export
-#        self.btnExport.setEnabled(True)
 
         self.radioTemplate.setChecked(True)
         self.draw_template(calcTemp=False)
@@ -914,7 +959,6 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
     """
     Methods related to plotting on the GUI canvas
     """
-
     def plot_multichannel(self, data, color=TEMPLATE_COLOR, scaling=None,
                           activations=None):
         """ Plot multichannel data on the figure canvas
@@ -962,7 +1006,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             # if activations are available use them to pick the color
             if activations is not None:
                 activation = activations[idx]
-                cmap = cm.get_cmap(COLOR_MAP)
+                cmap = cm.get_cmap(self.COLOR_MAP)
                 tmp_color = cmap(activation)
             else:
                 tmp_color = color
@@ -971,7 +1015,7 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
                 self.axes.plot(time, signal, color=tmp_color)
             else: # if all zeros / flat channel
                 if activations is None:
-                    tmp_color = FLAT_COLOR
+                    tmp_color = self.FLAT_COLOR
                 self.axes.plot(time, signal, color=tmp_color)
 
         # draw
@@ -1011,36 +1055,36 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
 
         x = np.linspace(xlim[0]+xpct, xlim[1]-xpct, num=energy.size)
 
-        self.axes.plot(x, energy, ENERGY_COLOR, zorder=1)
+        self.axes.plot(x, energy, self.ENERGY_COLOR, zorder=1)
         self.fill = self.axes.fill_between(x, energy, bottom,
-                                           color=ENERGY_COLOR)
+                                           color=self.ENERGY_COLOR)
 
         # draw lower bound graphics
         if self._energy_LB is not None:
             self.axes.plot(x[:(self._energy_LB+1)],
                            energy[:(self._energy_LB+1)],
-                           INACTIVE_COLOR, zorder=1)
+                           self.INACTIVE_COLOR, zorder=1)
             self.fill_LB = self.axes.fill_between(x[:(self._energy_LB+1)],
                                                   energy[:(self._energy_LB+1)],
                                                   bottom[:(self._energy_LB+1)],
-                                                  color=INACTIVE_COLOR)
+                                                  color=self.INACTIVE_COLOR)
 
         # draw upper bound graphics
         if self._energy_UB is not None:
             UB_idx = self._energy_UB - energy.size
 
-            self.axes.plot(x[UB_idx:], energy[UB_idx:], INACTIVE_COLOR, zorder=1)
+            self.axes.plot(x[UB_idx:], energy[UB_idx:], self.INACTIVE_COLOR, zorder=1)
             self.fill_UB = self.axes.fill_between(x[UB_idx:],
                                                   energy[UB_idx:],
                                                   bottom[UB_idx:],
-                                                  color=INACTIVE_COLOR)
+                                                  color=self.INACTIVE_COLOR)
 
         self.vline = self.axes.vlines(x[self._current_spike], ylim[0],
                                       energy[self._current_spike],
-                                      color=MARKER_COLOR,
+                                      color=self.MARKER_COLOR,
                                       linewidth=3, zorder=2)
         self.axes.plot(x[self._current_spike], energy[self._current_spike],
-                       color=MARKER_COLOR, marker='|')
+                       color=self.MARKER_COLOR, marker='|')
 
         self.axes.plot(x, np.ones(x.shape)*unit_line, 'k--', linewidth=0.5)
 
@@ -1112,7 +1156,6 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
     """
     Housekeeping methods
     """
-
     def reset_file_session_variables(self):
         """ Reset file session variables (variables related to certain file)
         """
@@ -1145,7 +1188,6 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.set_template_fit_enabled(False)
         self.set_move_template_enabled(False)
 
-#        self.btnExport.setEnabled(False)
         self.btnTemplateExport.setEnabled(False)
         self.btnTemplateImport.setEnabled(data_loaded)
 
@@ -1181,7 +1223,6 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.GUI_status['btnMoveRight'] = self.btnMoveRight.isEnabled()
         self.GUI_status['btnMoveDown'] = self.btnMoveDown.isEnabled()
         self.GUI_status['btnReset'] = self.btnReset.isEnabled()
-#        self.GUI_status['btnExport'] = self.btnExport.isEnabled()
         self.GUI_status['horizontalSlider'] = self.horizontalSlider.isEnabled()
         self.GUI_status['checkBoxLower'] = self.checkBoxLower.isEnabled()
         self.GUI_status['checkBoxUpper'] = self.checkBoxUpper.isEnabled()
@@ -1227,7 +1268,6 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
             self.btnMoveRight.setEnabled(False)
             self.btnMoveDown.setEnabled(False)
             self.btnReset.setEnabled(False)
-#            self.btnExport.setEnabled(False)
             self.horizontalSlider.setEnabled(False)
             self.checkBoxLower.setEnabled(False)
             self.checkBoxUpper.setEnabled(False)
@@ -1262,7 +1302,6 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.btnMoveRight.setEnabled(self.GUI_status['btnMoveRight'])
         self.btnMoveDown.setEnabled(self.GUI_status['btnMoveDown'])
         self.btnReset.setEnabled(self.GUI_status['btnReset'])
-#        self.btnExport.setEnabled(self.GUI_status['btnExport'])
         self.horizontalSlider.setEnabled(self.GUI_status['horizontalSlider'])
         self.btnResetZoom.setEnabled(self.GUI_status['btnResetZoom'])
         self.btnZoom.setEnabled(self.GUI_status['btnZoom'])
@@ -1281,120 +1320,13 @@ class Pybridizer(QtWidgets.QMainWindow, design.Ui_Pybridizer):
         self.GUI_enabled = True
 
 
-class TemplateWorker(QThread):
-    template_ready = pyqtSignal(SpikeTrain)
-
-    def __init__(self):
-        QThread.__init__(self)
-
-    def run(self):
-        # calculate template
-        self.spike_train.calculate_template(window_size=self.window_size,
-                                           zf_frac=self.zf_frac)
-        # calculate fit factors
-        self.spike_train.fit_spikes()
-
-        self.template_ready.emit(self.spike_train)
-
-
-class ActivationWorker(QThread):
-    activation_ready = pyqtSignal(np.ndarray, float)
-
-    def __init__(self):
-        QThread.__init__(self)
-
-    def run(self):
-        activations = self.recording.count_spikes(C=6).astype(np.float)
-        # clip activations for visual purposes
-        pct = np.percentile(activations, 90)
-        activations[activations > pct] = pct
-
-        # TODO move to own worker?
-        sig_power = self.recording.get_signal_power()
-
-        self.activation_ready.emit(activations, sig_power)
-
-# TODO add reinsert worker
-class MoveWorker(QThread):
-    move_ready = pyqtSignal(SpikeTrain, SpikeClusters)
-
-    def __init__(self):
-        QThread.__init__(self)
-
-        self.recording = None
-        self.spike_train = None
-        self.generated_GT = None
-
-        self.current_cluster = None
-        self.energy_LB = None
-        self.energy_UB = None
-        self.window_size = None
-        self.dump_path = None
-
-    def run(self):
-        self.spike_train.subtract_train()
-
-        # re-insert the shifted template for the selected energy interval
-        sorted_idxs = self.spike_train.get_energy_sorted_idxs().copy()
-        sorted_spikes = self.spike_train.get_energy_sorted_spikes().copy()
-
-        if self.energy_LB is None:
-            l_idx = None
-        else:
-            l_idx = self.energy_LB+1 # exclusive
-
-        if self.energy_UB is None:
-            u_idx = None
-        else:
-            u_idx = self.energy_UB # also exclusive, but handled by python
-
-        sorted_spikes_slice = sorted_spikes[l_idx:u_idx]
-        sorted_idxs = sorted_idxs[l_idx:u_idx]
-
-        assert(sorted_spikes_slice.shape == sorted_idxs.shape)
-
-        print('# {} spikes considered for migration'.format(int(sorted_spikes_slice.size)))
-
-        # add fixed temporal offset to avoid residual correlation
-        time_shift = int(2*self.window_size)
-        sorted_spikes_insert = sorted_spikes_slice + time_shift
-
-        # insertion shifted template
-        sorted_template_fit = self.spike_train._template_fitting[sorted_idxs]
-
-        assert(sorted_spikes_slice.shape == sorted_template_fit.shape)
-
-        inserted_spikes = self.spike_train.insert_given_train(sorted_spikes_insert,
-                                                             self.spike_train.template.shifted_template,
-                                                             sorted_template_fit)
-
-        self.spike_train.update(inserted_spikes)
-        self.spike_train.fit_spikes() 
-
-        self.generated_GT[self.current_cluster] = inserted_spikes
-
-        print('# {} spikes migrated'.format(int(inserted_spikes.size)))
-
-        self.flush()
-
-        self.move_ready.emit(self.spike_train, self.generated_GT)
-
-    def flush(self):
-        """ Flush recording and update GT
-        """
-        csv_path = os.path.join(self.dump_path, 'hybrid_GT.csv')
-        self.recording.flush()
-        print('# updated ground truth in {}'.format(csv_path))
-        self.generated_GT.dumpCSV(csv_path)
-
-
 def main():
     """ Main program
     """
     app = QtWidgets.QApplication(sys.argv)
 
     # classic style
-    form = Pybridizer()
+    form = ShyBride()
     form.show()
 
     app.exec_()
