@@ -257,10 +257,18 @@ class SpikeTrain:
 
         random_shift = current_position
 
-        while random_shift == current_position:
+        while self._no_valid_shift(random_shift, current_position):
             random_shift = np.random.randint(0, nb_positions)
 
         return random_shift - current_position
+
+    def _no_valid_shift(self, random, current):
+        """ Helper function to calculate random shift
+        """
+        if random == current or random == current + 1 or random == current - 1:
+            return True
+        else:
+            return False
 
 class Template:
     """ Template class

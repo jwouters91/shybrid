@@ -239,10 +239,20 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
                             phy = Phy(clus_params[clus_mode])
                             self.clusters = SpikeClusters()
                             self.clusters.fromPhy(phy)
+                            info_msg = 'The supplied prior spike sorting'\
+                                'information contains 0 clusters marked'\
+                                'as good.'
                         # load cluster information from csv
                         elif clus_mode == 'csv':
                             self.clusters = SpikeClusters()
                             self.clusters.fromCSV(clus_params[clus_mode])
+                            info_msg = 'The supplied prior spike sorting'\
+                                'information contains 0 clusters.'
+
+                        if len(self.clusters.keys()) == 0:
+                            QtWidgets.QMessageBox.information(self,
+                                                              'no clusters found',
+                                                              info_msg)
                 except Exception as e:
                     # throw message box for unexpected errors
                     QtWidgets.QMessageBox.critical(self, 'unexpected error',
@@ -1028,11 +1038,11 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
                 tmp_color = color
 
             if not signal.min() == signal.max():
-                self.axes.plot(time, signal, color=tmp_color)
+                self.axes.plot(time, signal, color=tmp_color, linewidth=1.5)
             else: # if all zeros / flat channel
                 if activations is None:
                     tmp_color = self.FLAT_COLOR
-                self.axes.plot(time, signal, color=tmp_color)
+                self.axes.plot(time, signal, color=tmp_color, linewidth=0.5)
 
         # draw
         self.axes.figure.canvas.draw()
