@@ -3,7 +3,7 @@
 """
 Created on Tue Apr 30 16:43:45 2019
 
-@author: jwouters
+@author: Jasper Wouters
 """
 
 import os
