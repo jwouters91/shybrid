@@ -399,7 +399,7 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
             elif template is not None:
                 self.spikeTrain = SpikeTrain(self.recording, np.array([]))
                 # if template is given through import overwrite
-                self.spikeTrain.calculate_template()
+                self.spikeTrain.calculate_template(from_import=True)
 
                 # overwrite data
                 self.spikeTrain.template.data = template
@@ -417,12 +417,12 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
             # enable options for further use
             self.radioTemplate.setChecked(True)
             self.radioTemplate.setEnabled(True)
-            if template is None:
-                self.radioFit.setEnabled(True)
-                self.set_display_template_enabled(True)
-            else:
+            if self.spikeTrain.template.imported:
                 self.radioFit.setEnabled(False)
                 self.set_display_template_enabled(False)
+            else:
+                self.radioFit.setEnabled(True)
+                self.set_display_template_enabled(True)
 
             self.btnTemplateExport.setEnabled(True)
 
@@ -735,6 +735,9 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         # sort these channels using the connected probe model
         channels = self.connected_probe.sort_given_channel_idx(channels)
 
+        # convert channels to good channels space
+        channels = self.recording.probe.chans_to_good_chans(channels)
+
         # ask feedback about number of export channels
         reply = QtWidgets.QMessageBox.question(self, 'export template', 
                                                'Export {} channels?'.format(channels.size),
@@ -785,7 +788,9 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
                                                   directory=self._select_path,
                                                   filter='CSV (*.csv)')
 
+
         if export_path != '':
+            # convert channels to good channels
             export_template = self.spikeTrain.template.data[channels.astype(np.int)]
 
             # normalize template before exporting
@@ -854,8 +859,12 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
             self.connected_probe.get_channels_from_zone(self.imported_template.shape[0],
                                                         x_reach, x_offset)
 
+        mapped_channels = self.recording.probe.chans_to_good_chans(mapped_channels)
+
         nb_good = self.recording.get_nb_good_channels()
         window = self.imported_template.shape[1]
+
+        self._window_samples = window
 
         template = np.zeros((nb_good, window))
 
@@ -899,12 +908,12 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         # poisson distribution spike times
         spike = 0
         dur = self.recording.get_duration()
-        lam = self.recording.sampling_rate / rate
+        beta = self.recording.sampling_rate / rate
         refr = int(self.recording.sampling_rate * refr / 1000) # discretize
 
         spikes_insert = np.array([], dtype=np.int)
         while spike < dur:
-            isi = np.random.poisson(lam=lam)
+            isi = np.random.exponential(scale=beta)
             if isi < refr:
                 isi = refr
             spike += isi
@@ -917,10 +926,13 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         desired_peak_power = 10**(snr/10) * self.sig_power
         insert_waveform = insert_waveform / peak * np.sqrt(desired_peak_power)
 
+        self.disable_GUI()
         # insert scaled template
         inserted_spikes = self.spikeTrain.insert_given_train(spikes_insert,
                                                              insert_waveform,
                                                              np.ones(spikes_insert.shape))
+        self.recording.flush()
+        self.enable_GUI()
 
         self.spikeTrain.update(inserted_spikes)
 
@@ -939,6 +951,10 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         self.generated_GT[self._current_cluster] = inserted_spikes
 
         print('# Inserted spikes were assigned to new cluster', new_item)
+
+        csv_path = os.path.join(self._select_path, 'hybrid_GT.csv')
+        print('# updated ground truth in {}'.format(csv_path))
+        self.generated_GT.dumpCSV(csv_path)
 
         self.insertTemplateContainer.close()
 

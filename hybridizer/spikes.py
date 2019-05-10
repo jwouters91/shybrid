@@ -3,7 +3,7 @@
 """
 Created on Wed Sep 12 13:52:29 2018
 
-@author: jwouters
+@author: Jasper Wouters
 """
 
 import numpy as np
@@ -26,12 +26,13 @@ class SpikeTrain:
         # init this cache, sorting only once on first request
         self._energy_sorted_idxs = None
 
-    def calculate_template(self, window_size=100, realign=False, zf_frac=0.03):
+    def calculate_template(self, window_size=100, realign=False, zf_frac=0.03,
+                           from_import=False):
         """ Calculate a template for this spike train for the given discrete
         window size
         """
         self.template = Template(self, window_size, realign=realign,
-                                 zf_frac=zf_frac)
+                                 zf_frac=zf_frac, from_import=from_import)
 
     def get_nb_spikes(self):
         """ Return the number of spikes in the spike train
@@ -275,7 +276,15 @@ class Template:
     """
 
     def __init__(self, spike_train, window_size, realign=False,
-                 force_zero=True, calculate_PC=False, zf_frac=0.03):
+                 force_zero=True, calculate_PC=False, zf_frac=0.03,
+                 from_import=False):
+        # empty constructor when from_import
+        if from_import:
+            self.imported=True
+            return
+        else:
+            self.imported=False
+
         self.window_size = window_size
 
         # build spike tensor

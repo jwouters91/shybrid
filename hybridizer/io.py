@@ -3,7 +3,7 @@
 """
 Created on Tue Sep 11 10:16:20 2018
 
-@author: jwouters
+@author: Jasper Wouters
 """
 
 import os
@@ -395,6 +395,23 @@ class Probe:
 
         return y_between
 
+    def chans_to_good_chans(self, chans):
+        """ Convert given channels to good channels, preserves the order
+
+        Parameters
+        ----------
+        chans (array_like) : array containing channels in the original domain
+
+        Returns
+        -------
+        good_chans (ndarray) : array containing the given channels in the good
+        channels domain
+        """
+        good_chans = []
+        for chan in chans:
+            good_chans += [np.where(self.channels == chan)[0][0]]
+
+        return np.array(good_chans)
 
 class RectangularProbe:
     """ A model for probes that have a rectangular electrode grid. Automatic
