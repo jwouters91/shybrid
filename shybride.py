@@ -4,7 +4,24 @@
 Created on Fri Sep 28 13:36:01 2018
 
 @author: Jasper Wouters
+
+SHY BRIDE
+Copyright (C) 2018  Jasper Wouters
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+
 import sys
 import os
 import yaml
@@ -52,6 +69,8 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         self.create_color_bar()
 
         self.init_multi_threading()
+
+        self.print_legal()
 
     def connect_listeners(self):
         """ Connect listener functions to GUI signals
@@ -166,6 +185,15 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         self._select_path = os.path.expanduser('~')
         # tracks the state of the GUI
         self.GUI_enabled = True
+
+    def print_legal(self):
+        """ print license related information
+        """
+        note = 'SHY BRIDE  Copyright (C) 2018  Jasper Wouters\n'\
+               'This program comes with ABSOLUTELY NO WARRANTY. '\
+               'This is free software, and you are welcome to redistribute it '\
+               'under certain conditions.'
+        print(note)
 
 
     """
