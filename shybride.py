@@ -192,7 +192,7 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
     def print_legal(self):
         """ print license related information
         """
-        note = 'SHYBRID  Copyright (C) 2018  Jasper Wouters\n'\
+        note = 'SHYBRID  Copyright (C) 2019  Jasper Wouters\n'\
                'This program comes with ABSOLUTELY NO WARRANTY. '\
                'This is free software, and you are welcome to redistribute it '\
                'under certain conditions.'
@@ -443,6 +443,7 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
                 self.spikeTrain.calculate_template(from_import=True)
 
                 # overwrite data
+                # TODO add external data constructor to template
                 self.spikeTrain.template.data = template
                 self.spikeTrain.template.window_size = template.shape[1]
 

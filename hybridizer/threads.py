@@ -81,7 +81,7 @@ class MoveWorker(QThread):
         self.dump_path = None
 
     def run(self):
-        self.spike_train.subtract_train()
+        self.spike_train.subtract()
 
         # re-insert the shifted template for the selected energy interval
         sorted_idxs = self.spike_train.get_energy_sorted_idxs().copy()
