@@ -5,7 +5,7 @@ Created on Tue Sep 11 10:16:20 2018
 
 @author: Jasper Wouters
 
-SHY BRIDE
+SHYBRID
 Copyright (C) 2018  Jasper Wouters
 
 This program is free software: you can redistribute it and/or modify

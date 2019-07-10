@@ -5,7 +5,7 @@ Created on Fri Sep 28 13:36:01 2018
 
 @author: Jasper Wouters
 
-SHY BRIDE
+SHYBRID
 Copyright (C) 2018  Jasper Wouters
 
 This program is free software: you can redistribute it and/or modify
@@ -54,7 +54,8 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
     INACTIVE_COLOR = 'gray'
     FLAT_COLOR = 'lightgray'
     MARKER_COLOR = 'darkslategray'
-    COLOR_MAP = 'winter'
+#    COLOR_MAP = 'winter'
+    COLOR_MAP = 'rainbow'
 
     def __init__(self, parent=None):
         # setup UI
@@ -105,6 +106,8 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
 
         self.btnTemplateExport.clicked.connect(self.export_template)
         self.btnTemplateImport.clicked.connect(self.import_template)
+
+        self.btnUndo.clicked.connect(self.undo_move)
 
     def create_plotting_area(self):
         """ create and set up main plotting area
@@ -189,7 +192,7 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
     def print_legal(self):
         """ print license related information
         """
-        note = 'SHY BRIDE  Copyright (C) 2018  Jasper Wouters\n'\
+        note = 'SHYBRID  Copyright (C) 2018  Jasper Wouters\n'\
                'This program comes with ABSOLUTELY NO WARRANTY. '\
                'This is free software, and you are welcome to redistribute it '\
                'under certain conditions.'
@@ -756,10 +759,18 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
 
         self.enable_GUI()
 
+        self.btnUndo.setEnabled(True)
+
         self.draw_template(calcTemp=False)
 
         self.magicEventLoop.exit()
 
+    def undo_move(self):
+        """ Undo the last spike train relocation
+        """
+        # check if the previous train was original or already a hybrid and remove from GT if needed
+        print('undo clicked')
+        self.btnUndo.setEnabled(False)
 
     """
     Methods related to exporting the active template
@@ -1290,6 +1301,7 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         self.GUI_status['zeroForceFraction'] = self.zeroForceFraction.isEnabled()
         self.GUI_status['btnMagic'] = self.btnMagic.isEnabled()
         self.GUI_status['zeroForceLabel'] = self.zeroForceLabel.isEnabled()
+        self.GUI_status['btnUndo'] = self.btnUndo.isEnabled()
 
     def disable_GUI(self, msg=None):
         """ Disable GUI
@@ -1335,6 +1347,7 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
             self.zeroForceFraction.setEnabled(False)
             self.btnMagic.setEnabled(False)
             self.zeroForceLabel.setEnabled(False)
+            self.btnUndo.setEnabled(False)
 
             # force repainting of entire GUI
             self.repaint()
@@ -1366,6 +1379,7 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         self.zeroForceFraction.setEnabled(self.GUI_status['zeroForceFraction'])
         self.btnMagic.setEnabled(self.GUI_status['btnMagic'])
         self.zeroForceLabel.setEnabled(self.GUI_status['zeroForceLabel'])
+        self.btnUndo.setEnabled(self.GUI_status['btnUndo'])
 
         self.progressBar.setMaximum(1)
         self.progressBar.setEnabled(False)

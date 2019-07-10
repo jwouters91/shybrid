@@ -5,7 +5,7 @@ Created on Wed Sep 12 13:52:29 2018
 
 @author: Jasper Wouters
 
-SHY BRIDE
+SHYBRID
 Copyright (C) 2018  Jasper Wouters
 
 This program is free software: you can redistribute it and/or modify
@@ -160,6 +160,11 @@ class SpikeTrain:
 
         inserted_spikes.sort()
         return inserted_spikes
+
+    def subtract_given_train(self, spike_times, template, template_fitting):
+        """ Subtract a given spike train
+        """
+        pass
 
     def update(self, spike_times):
         """ Update spike times and trigger resets

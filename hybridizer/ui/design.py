@@ -1,28 +1,18 @@
-"""
-SHY BRIDE
-Copyright (C) 2018  Jasper Wouters
+# -*- coding: utf-8 -*-
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
+# Form implementation generated from reading ui file 'hybridizer.ui'
+#
+# Created by: PyQt5 UI code generator 5.5.1
+#
+# WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 class Ui_ShyBride(object):
     def setupUi(self, ShyBride):
         ShyBride.setObjectName("ShyBride")
-        ShyBride.resize(1186, 744)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Minimum)
+        ShyBride.resize(1186, 807)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Expanding)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(ShyBride.sizePolicy().hasHeightForWidth())
@@ -103,7 +93,11 @@ class Ui_ShyBride(object):
         self.verticalLayout.addLayout(self.horizontalLayout_8)
         self.radioTemplate = QtWidgets.QRadioButton(self.centralwidget)
         self.radioTemplate.setEnabled(False)
+        font = QtGui.QFont()
+        font.setKerning(True)
+        self.radioTemplate.setFont(font)
         self.radioTemplate.setMouseTracking(True)
+        self.radioTemplate.setShortcut("")
         self.radioTemplate.setCheckable(True)
         self.radioTemplate.setChecked(True)
         self.radioTemplate.setAutoExclusive(True)
@@ -224,10 +218,27 @@ class Ui_ShyBride(object):
         self.btnMoveRight.setObjectName("btnMoveRight")
         self.horizontalLayout_6.addWidget(self.btnMoveRight)
         self.verticalLayout.addLayout(self.horizontalLayout_6)
+        self.horizontalLayout_14 = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_14.setObjectName("horizontalLayout_14")
+        spacerItem6 = QtWidgets.QSpacerItem(10, 20, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum)
+        self.horizontalLayout_14.addItem(spacerItem6)
+        self.checkCustomSNR = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkCustomSNR.setEnabled(False)
+        self.checkCustomSNR.setObjectName("checkCustomSNR")
+        self.horizontalLayout_14.addWidget(self.checkCustomSNR)
+        self.spinSNR = QtWidgets.QDoubleSpinBox(self.centralwidget)
+        self.spinSNR.setEnabled(False)
+        self.spinSNR.setFrame(False)
+        self.spinSNR.setMinimum(-99.0)
+        self.spinSNR.setMaximum(99.0)
+        self.spinSNR.setProperty("value", 10.0)
+        self.spinSNR.setObjectName("spinSNR")
+        self.horizontalLayout_14.addWidget(self.spinSNR)
+        self.verticalLayout.addLayout(self.horizontalLayout_14)
         self.horizontalLayout_7 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_7.setObjectName("horizontalLayout_7")
-        spacerItem6 = QtWidgets.QSpacerItem(10, 20, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum)
-        self.horizontalLayout_7.addItem(spacerItem6)
+        spacerItem7 = QtWidgets.QSpacerItem(10, 20, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum)
+        self.horizontalLayout_7.addItem(spacerItem7)
         self.checkHeatMap = QtWidgets.QCheckBox(self.centralwidget)
         self.checkHeatMap.setEnabled(False)
         self.checkHeatMap.setChecked(True)
@@ -255,8 +266,12 @@ class Ui_ShyBride(object):
         self.btnMove.setEnabled(False)
         self.btnMove.setObjectName("btnMove")
         self.verticalLayout.addWidget(self.btnMove)
-        spacerItem7 = QtWidgets.QSpacerItem(0, 0, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.MinimumExpanding)
-        self.verticalLayout.addItem(spacerItem7)
+        self.btnUndo = QtWidgets.QPushButton(self.centralwidget)
+        self.btnUndo.setEnabled(False)
+        self.btnUndo.setObjectName("btnUndo")
+        self.verticalLayout.addWidget(self.btnUndo)
+        spacerItem8 = QtWidgets.QSpacerItem(20, 0, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        self.verticalLayout.addItem(spacerItem8)
         self.progressLabel = QtWidgets.QLabel(self.centralwidget)
         self.progressLabel.setText("")
         self.progressLabel.setAlignment(QtCore.Qt.AlignCenter)
@@ -282,8 +297,8 @@ class Ui_ShyBride(object):
         self.plotLayout.setObjectName("plotLayout")
         self.horizontalLayout_9 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_9.setObjectName("horizontalLayout_9")
-        spacerItem8 = QtWidgets.QSpacerItem(5, 20, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum)
-        self.horizontalLayout_9.addItem(spacerItem8)
+        spacerItem9 = QtWidgets.QSpacerItem(5, 20, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum)
+        self.horizontalLayout_9.addItem(spacerItem9)
         self.labelPlotControl = QtWidgets.QLabel(self.centralwidget)
         self.labelPlotControl.setEnabled(False)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Preferred)
@@ -331,7 +346,7 @@ class Ui_ShyBride(object):
 
     def retranslateUi(self, ShyBride):
         _translate = QtCore.QCoreApplication.translate
-        ShyBride.setWindowTitle(_translate("ShyBride", "SHY BRIDE - Spike HYBRIDizer for Extracellular recordings"))
+        ShyBride.setWindowTitle(_translate("ShyBride", "SHYBRID: open-source spike hybridizer for extracellular recordings"))
         self.btnDataSelect.setText(_translate("ShyBride", "select data"))
         self.listClusterSelect.setCurrentText(_translate("ShyBride", "select cluster"))
         self.listClusterSelect.setItemText(0, _translate("ShyBride", "select cluster"))
@@ -348,14 +363,16 @@ class Ui_ShyBride(object):
         self.btnRightSpike.setText(_translate("ShyBride", "→"))
         self.checkBoxLower.setText(_translate("ShyBride", "set energy lower bound"))
         self.checkBoxUpper.setText(_translate("ShyBride", "set energy upper bound"))
-        self.radioMove.setText(_translate("ShyBride", "move &template"))
+        self.radioMove.setText(_translate("ShyBride", "relocate spi&ke train"))
         self.btnMoveLeft.setText(_translate("ShyBride", "←"))
         self.btnMoveUp.setText(_translate("ShyBride", "↑"))
         self.btnReset.setText(_translate("ShyBride", "reset"))
         self.btnMoveDown.setText(_translate("ShyBride", "↓"))
         self.btnMoveRight.setText(_translate("ShyBride", "→"))
+        self.checkCustomSNR.setText(_translate("ShyBride", "enforce custom SNR (dB):"))
         self.checkHeatMap.setText(_translate("ShyBride", "show mean spike rate (Hz)"))
         self.btnMove.setText(_translate("ShyBride", "(re)insert template"))
+        self.btnUndo.setText(_translate("ShyBride", "undo last insert"))
         self.labelPlotControl.setText(_translate("ShyBride", "plot control"))
         self.btnResetZoom.setText(_translate("ShyBride", "reset"))
         self.btnZoom.setText(_translate("ShyBride", "zoom"))
