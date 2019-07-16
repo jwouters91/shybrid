@@ -11,7 +11,8 @@ from collections import deque
 class HybridCluster:
     """ A class modeling a hybrid cluster and the operations performed on it
     """
-    def __init__(self, spike_train):
+    def __init__(self, idx, spike_train):
+        self.idx = idx
         self.root = spike_train
         self.__ops = deque()
 
@@ -59,7 +60,7 @@ class Insert(HybridizationOperator):
     """ Operator that defines a spike train addition
     """
     def __init__(self, spike_train):
-        HybridizationOperator.__init__(spike_train)
+        HybridizationOperator.__init__(self, spike_train)
 
     def execute(self):
         """ apply operation to data
@@ -75,7 +76,7 @@ class Subtract(HybridizationOperator):
     """ Operator that defines a spike train subtraction
     """
     def __init__(self, spike_train):
-        HybridizationOperator.__init__(spike_train)
+        HybridizationOperator.__init__(self, spike_train)
 
     def execute(self):
         """ apply operation to data

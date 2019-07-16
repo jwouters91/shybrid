@@ -30,6 +30,7 @@ from PyQt5.QtCore import QThread, pyqtSignal
 
 from hybridizer.io import SpikeClusters
 from hybridizer.spikes import SpikeTrain
+from hybridizer.hybrid import Insert, Subtract
 
 
 class TemplateWorker(QThread):
@@ -40,8 +41,8 @@ class TemplateWorker(QThread):
 
     def run(self):
         # calculate template
-        self.spike_train.calculate_template(window_size=self.window_size,
-                                           zf_frac=self.zf_frac)
+        self.spike_train.calculate_template(self.window_size,
+                                            zf_frac=self.zf_frac)
         # calculate fit factors
         self.spike_train.fit_spikes()
 
@@ -65,27 +66,17 @@ class ActivationWorker(QThread):
         self.activation_ready.emit(activations, sig_power)
 
 class MoveWorker(QThread):
-    move_ready = pyqtSignal(SpikeTrain, SpikeClusters)
+    move_ready = pyqtSignal()
 
     def __init__(self):
         QThread.__init__(self)
 
-        self.recording = None
-        self.spike_train = None
-        self.generated_GT = None
-
-        self.current_cluster = None
-        self.energy_LB = None
-        self.energy_UB = None
-        self.window_size = None
-        self.dump_path = None
-
     def run(self):
-        self.spike_train.subtract()
+        spike_train = self.cluster.get_actual_spike_train()
+        train_subtraction = Subtract(spike_train)
+        self.cluster.apply_operator(train_subtraction)
 
-        # re-insert the shifted template for the selected energy interval
-        sorted_idxs = self.spike_train.get_energy_sorted_idxs().copy()
-        sorted_spikes = self.spike_train.get_energy_sorted_spikes().copy()
+        sorted_spikes = spike_train.get_energy_sorted_spikes().copy()
 
         if self.energy_LB is None:
             l_idx = None
@@ -97,41 +88,38 @@ class MoveWorker(QThread):
         else:
             u_idx = self.energy_UB # also exclusive, but handled by python
 
-        sorted_spikes_slice = sorted_spikes[l_idx:u_idx]
-        sorted_idxs = sorted_idxs[l_idx:u_idx]
-
-        assert(sorted_spikes_slice.shape == sorted_idxs.shape)
-
-        print('# {} spikes considered for migration'.format(int(sorted_spikes_slice.size)))
+        sorted_spikes = sorted_spikes[l_idx:u_idx]
+        print('# {} spikes considered for migration'.format(int(sorted_spikes.size)))
 
         # add fixed temporal offset to avoid residual correlation
-        time_shift = int(2*self.window_size)
-        sorted_spikes_insert = sorted_spikes_slice + time_shift
+        time_shift = int(2*spike_train.template.window_size)
+        sorted_spikes += time_shift
+
+        # look for out of bounds spikes (conservative bound used here)
+        within_bounds = sorted_spikes <  (spike_train.recording.get_duration() - spike_train.template.window_size)
+        sorted_spikes = sorted_spikes[within_bounds]
 
         # insertion shifted template
-        sorted_template_fit = self.spike_train._template_fitting[sorted_idxs]
+        sorted_template_fit = spike_train.get_energy_sorted_fittings().copy()
+        sorted_template_fit = sorted_template_fit[l_idx:u_idx]
+        sorted_template_fit = sorted_template_fit[within_bounds]
 
-        assert(sorted_spikes_slice.shape == sorted_template_fit.shape)
+        assert(sorted_spikes.shape == sorted_template_fit.shape)
 
-        inserted_spikes = self.spike_train.insert_given_train(sorted_spikes_insert,
-                                                             self.spike_train.template.shifted_template,
-                                                             sorted_template_fit)
+        insert_train = SpikeTrain(spike_train.recording, sorted_spikes,
+                                  template=self.shifted_template,
+                                  template_fitting=sorted_template_fit)
 
-        self.spike_train.update(inserted_spikes)
-        self.spike_train.fit_spikes() 
+        train_insertion = Insert(insert_train)
+        self.cluster.apply_operator(train_insertion)
 
-        self.generated_GT[self.current_cluster] = inserted_spikes
-
-        print('# {} spikes migrated'.format(int(inserted_spikes.size)))
+        print('# {} spikes migrated'.format(int(sorted_spikes.size)))
 
         self.flush()
 
-        self.move_ready.emit(self.spike_train, self.generated_GT)
+        self.move_ready.emit()
 
     def flush(self):
         """ Flush recording and update GT
         """
-        csv_path = os.path.join(self.dump_path, 'hybrid_GT.csv')
-        self.recording.flush()
-        print('# updated ground truth in {}'.format(csv_path))
-        self.generated_GT.dumpCSV(csv_path)
+        self.cluster.get_actual_spike_train().recording.flush()

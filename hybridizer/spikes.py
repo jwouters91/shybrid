@@ -34,22 +34,25 @@ class SpikeTrain:
         spike_times (ndarray): array containing times of every spike
     """
 
-    def __init__(self, recording, spike_times, template=None):
+    def __init__(self, recording, spike_times, template=None,
+                 template_fitting=None):
         self.recording = recording
         self.spikes = spike_times
         self.template = template
 
-        # init this cache, sorting only once on first request
-        self._energy_sorted_idxs = None
+        if template_fitting is not None:
+            self._template_fitting = template_fitting
+            self._fitting_energy = template_fitting**2
 
-    # TODO decouple the calculation of the template from the 
-    def calculate_template(self, window_size=100, zf_frac=0.03,
-                           from_import=False):
+        self._energy_sorted_idxs = None
+        self._PSNR = None
+
+    def calculate_template(self, window_size, from_import=False, zf_frac=0.03):
         """ Calculate a template for this spike train for the given discrete
         window size
         """
-        self.template = Template(self, window_size, zf_frac=zf_frac,
-                                 from_import=from_import)
+        self.template = Template(from_import=from_import, zf_frac=zf_frac)
+        self.template.calculate_from_spike_train(self, window_size)
 
     def get_nb_spikes(self):
         """ Return the number of spikes in the spike train
@@ -73,6 +76,9 @@ class SpikeTrain:
             # fitting energy only based on template
             self._fitting_energy[idx] = temp_fit**2
 
+        # important to reset the energy sorted idxs on a new fit
+        self._energy_sorted_idxs = None
+
     def subtract(self):
         """ Subtract spike train from the recording.
         """
@@ -82,6 +88,10 @@ class SpikeTrain:
             start, end = self.get_spike_start_end(spike)
 
             temp_fit = self._template_fitting[idx]
+
+            if temp_fit == 0:
+                continue
+
             fitted_waveform = self.template.get_fitted_waveform(temp_fit)
 
             # subtract
@@ -97,24 +107,15 @@ class SpikeTrain:
             start, end = self.get_spike_start_end(spike)
 
             temp_fit = self._template_fitting[idx]
+
+            if temp_fit == 0:
+                continue
+
             fitted_waveform = self.template.get_fitted_waveform(temp_fit)
 
-            # subtract
+            # insert
             self.recording.data[channels, start:end] = \
                  self.recording.data[channels, start:end] + fitted_waveform
-
-
-    def update(self, spike_times):
-        """ Update spike times and trigger resets
-        """
-        self.spikes = spike_times
-
-        self._template_fitting = None
-        self._residual_fitting = None
-        self._fitting_energy = None
-        self._energy_sorted_idxs = None
-
-        self.calculate_template(window_size=self.template.window_size)
 
     def get_spike_start_end(self, spike):
         """ Get start and end for the given spike
@@ -148,6 +149,9 @@ class SpikeTrain:
         This method requires that the energies have been initialized already
         """
         return self.spikes[self.get_energy_sorted_idxs()]
+
+    def get_energy_sorted_fittings(self):
+        return self._template_fitting[self.get_energy_sorted_idxs()]
 
     def get_automatic_energy_bounds(self, C=0.75):
         """ Return the lower and upper index obtained from robust
@@ -225,29 +229,41 @@ class SpikeTrain:
         else:
             return False
 
+    def get_PSNR(self):
+        """ Calculate the peak-signal-to-noise ratio
+        """
+        if self._PSNR is None:
+            max_channel = self.template.get_max_channel_idx()
+
+            PS = np.abs(self.template.get_template_data()[max_channel]).max()
+            PS = PS**2
+
+            N = self.recording.get_signal_power_for_channel(max_channel)
+
+            self._PSNR = 10*np.log10(PS / N)
+
+        return self._PSNR
+        
+
 class Template:
     """ Template class
-
-    Args:
-        spike_train (SpikeTrain): spike train
-
-        window_size (int): window size used to determine te template
-
-        realign (boolean, optional): realign spikes based on template matched
-        filter. Realign will also affect the spike train given to this
-        function.
     """
+    def __init__(self, data=None, from_import=False, zf_frac=None):
+        if data is not None:
+            self._data = data
+            self.window_size = self._data.shape[1]
+            self._calculate_template_energy()
 
-    def __init__(self, spike_train, window_size, force_zero=True, zf_frac=0.03,
-                 from_import=False):
-        # empty constructor when from_import
-        # TODO split constructors for template estimate on data and for imported
         if from_import:
             self.imported=True
-            return
         else:
             self.imported=False
 
+        self._zf_frac = zf_frac
+
+    def calculate_from_spike_train(self, spike_train, window_size):
+        """ Calculate a spike template using the given spike train
+        """
         self.window_size = window_size
 
         # build spike tensor
@@ -268,22 +284,36 @@ class Template:
                 spike_train.recording.get_good_chunk(start,
                                                      end)
 
-        self.data = np.median(spike_tensor, axis=0)
+        self._data = np.median(spike_tensor, axis=0)
+        self._calculate_template_energy()
 
-        # set every channel to zero that has less than (zf*100)% of max channel energy
-        # TODO move this out of the constructor
-        if force_zero:
-            # remove DC form template to calculate the energy
-            DC_corrected_temp = self.data - self.data.mean(axis=1)[:,np.newaxis]
-            energy = DC_corrected_temp**2
-            energy = np.sum(energy, axis=1)
-            self.data[energy<zf_frac*energy.max(),:] = 0
+    def _calculate_template_energy(self):
+        """ Calculate the template energy in every channel
+        """
+        DC_corrected_temp = self._data - self._data.mean(axis=1)[:,np.newaxis]
+        energy = DC_corrected_temp**2
+        self._energy = np.sum(energy, axis=1)
 
-    def calculate_shifted_template(self, spike_train, x_shift, y_shift):
+    def get_template_data(self):
+        """ Return the template data containing the waveform
+        """
+        tmp_data = self._data.copy()
+
+        if self._zf_frac is not None:
+            tmp_data[self._energy<self._zf_frac*self._energy.max(),:] = 0
+
+        return tmp_data
+
+    def update_zf_frac(self, zf_frac):
+        """ Update the zero force fraction
+        """
+        self._zf_frac = zf_frac
+
+    def get_shifted_template(self, spike_train, x_shift, y_shift):
         """ Calculate shifted template
         """
         # initialize shifted template
-        shifted_template = np.zeros(spike_train.template.data.shape)
+        shifted_template = np.zeros(spike_train.template._data.shape)
 
         # extract geometrical information
         x_between = spike_train.recording.probe.x_between
@@ -308,7 +338,7 @@ class Template:
                 continue
 
             # initialize interpolated waveform
-            interpolated_waveform = np.zeros(spike_train.template.data[0].shape)
+            interpolated_waveform = np.zeros(spike_train.template._data[0].shape)
 
             interpolation_count = 0
             interpolation_needed = True
@@ -318,24 +348,23 @@ class Template:
                 project_geo = spike_train.recording.probe.geometry[project_channel]
 
                 if geo_x == project_geo[0] and geo_y == project_geo[1]:
-                    shifted_template[idx] = spike_train.template.data[jdx]
+                    shifted_template[idx] = spike_train.template._data[jdx]
                     interpolation_needed = False
                 else:
                     if abs(geo_x - project_geo[0]) <= x_between and abs(geo_y - project_geo[1]) <= y_between:
-                        interpolated_waveform += spike_train.template.data[jdx]
+                        interpolated_waveform += spike_train.template._data[jdx]
                         interpolation_count += 1
 
             if interpolation_needed and interpolation_count > 0:
                 shifted_template[idx] = interpolated_waveform / interpolation_count
 
-        # set those shifted waveforms as class variables for reuse
-        # TODO this function should return a new Template object
-        self.shifted_template = shifted_template
+        return Template(data=shifted_template, zf_frac=self._zf_frac)
 
     def _fit_template(self, chunk):
         """ Fit the given chunk to the template
         """
-        template_flat = self.data.flatten()
+        # make use of zero forcing while fitting -> load template through api
+        template_flat = self.get_template_data().flatten()
         chunk_flat = chunk.flatten()
 
         # boundary cases set to zero (i.e., they don't get subtracted)
@@ -351,7 +380,7 @@ class Template:
     def get_fitted_waveform(self, template_fit):
         """ Return fitted waveform
         """
-        return template_fit * self.data
+        return template_fit * self.get_template_data()
 
     def get_max_channel_idx(self):
         """ Return the index of the maximum peak energy channel in the good
@@ -363,4 +392,4 @@ class Template:
         channel_idx (int) : index indication the channel with the highest
         template peak energy
         """
-        return np.argmax(np.max(np.abs(self.data), axis=1))
+        return np.argmax(np.max(np.abs(self.get_template_data()), axis=1))
