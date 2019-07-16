@@ -99,6 +99,7 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         self.btnMoveDown.clicked.connect(self.move_down)
         self.btnReset.clicked.connect(self.move_template)
         self.checkHeatMap.clicked.connect(self.toggle_heat_map)
+        self.checkCustomSNR.clicked.connect(self.toggle_custom_snr)
         self.btnMove.clicked.connect(self.execute_move)
 
         self.btnResetZoom.clicked.connect(self.reset_view_plot)
@@ -675,6 +676,13 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         self.btnMoveRight.setEnabled(enabled)
         self.btnMoveDown.setEnabled(enabled)
         self.checkHeatMap.setEnabled(enabled)
+        self.checkCustomSNR.setEnabled(enabled)
+
+        # enable SNR spinbox only if the checkbox is checked
+        if self.checkCustomSNR.isChecked():
+            self.spinSNR.setEnabled(enabled)
+        else:
+            self.spinSNR.setEnabled(False)
 
         self.btnMove.setEnabled(False)
         self.btnReset.setEnabled(False)
@@ -721,9 +729,18 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
 
         self.show_color_bar(self.checkHeatMap.isChecked())
 
+    def toggle_custom_snr(self):
+        """ Toggle the custom SNR spinbox
+        """
+        if self.checkCustomSNR.isChecked():
+            self.spinSNR.setEnabled(True)
+        else:
+            self.spinSNR.setEnabled(False)
+
     def toggle_heat_map(self):
         """ Toggle spike count heatmap in move template view
         """
+        # TODO argument should be passed instead of relying on internals
         self.render_shifted_template()
 
     def show_color_bar(self, show, show_labels=True):
@@ -770,7 +787,10 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
             self.moveWorker.energy_LB = self._energy_LB
             self.moveWorker.energy_UB = self._energy_UB
 
-            self.moveWorker.dump_path = self._select_path
+            if self.checkCustomSNR.isChecked():
+                self.moveWorker.target_PSNR = self.spinSNR.value()
+            else:
+                self.moveWorker.target_PSNR = None
 
             self.moveWorker.start()
             return
@@ -1368,6 +1388,8 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         self.GUI_status['btnMagic'] = self.btnMagic.isEnabled()
         self.GUI_status['zeroForceLabel'] = self.zeroForceLabel.isEnabled()
         self.GUI_status['btnUndo'] = self.btnUndo.isEnabled()
+        self.GUI_status['checkCustomSNR'] = self.checkCustomSNR.isEnabled()
+        self.GUI_status['spinSNR'] = self.spinSNR.isEnabled()
 
     def disable_GUI(self, msg=None):
         """ Disable GUI
@@ -1415,6 +1437,8 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
             self.btnMagic.setEnabled(False)
             self.zeroForceLabel.setEnabled(False)
             self.btnUndo.setEnabled(False)
+            self.checkCustomSNR.setEnabled(False)
+            self.spinSNR.setEnabled(False)
 
             # force repainting of entire GUI
             self.repaint()
@@ -1448,6 +1472,8 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         self.btnMagic.setEnabled(self.GUI_status['btnMagic'])
         self.zeroForceLabel.setEnabled(self.GUI_status['zeroForceLabel'])
         self.btnUndo.setEnabled(self.GUI_status['btnUndo'])
+        self.checkCustomSNR.setEnabled(self.GUI_status['checkCustomSNR'])
+        self.spinSNR.setEnabled(self.GUI_status['spinSNR'])
 
         self.progressBar.setMaximum(1)
         self.progressBar.setEnabled(False)

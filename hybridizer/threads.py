@@ -110,6 +110,9 @@ class MoveWorker(QThread):
                                   template=self.shifted_template,
                                   template_fitting=sorted_template_fit)
 
+        if self.target_PSNR is not None:
+            insert_train.set_target_PSNR(self.target_PSNR)
+
         train_insertion = Insert(insert_train)
         self.cluster.apply_operator(train_insertion)
 

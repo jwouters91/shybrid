@@ -243,7 +243,19 @@ class SpikeTrain:
             self._PSNR = 10*np.log10(PS / N)
 
         return self._PSNR
-        
+
+    def set_target_PSNR(self, target_PSNR):
+        """ Set the target PSNR by scaling the template
+        """
+        desired_scaling = np.sqrt(10**(target_PSNR/10))
+        actual_scaling = np.sqrt(10**(self.get_PSNR()/10))
+        scaling = desired_scaling / actual_scaling
+
+        # scale template
+        self.template._data *= scaling
+
+        # PSNR altered, so reset the PSNR
+        self._PSNR = None
 
 class Template:
     """ Template class

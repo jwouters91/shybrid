@@ -174,7 +174,8 @@ class Recording:
     def get_signal_power_for_channel(self, channel, dur=30):
         """ Return the signal power
         """
-        return self.data[self.probe.channels, :int(dur*self.sampling_rate)][channel].var()
+        # inspired by MAD assuming zero-median signal and then correcting to std (x1.5), all of this assumes normally distributed data
+        return (np.median(np.abs(self.data[self.probe.channels, :int(dur*self.sampling_rate)][channel]))*1.5)**2
 
 class SpikeClusters:
     """ Class modeling a collection of spike clusters
