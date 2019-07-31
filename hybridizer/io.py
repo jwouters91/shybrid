@@ -243,6 +243,21 @@ class SpikeClusters:
 
             self[cluster] = HybridCluster(cluster, spike_train)
 
+    def forget_recording(self):
+        for cluster_idx in self.keys():
+            self[cluster_idx].forget_recording()
+
+    def add_recording(self, recording):
+        for cluster_idx in self.keys():
+            self[cluster_idx].add_recording(recording)
+
+    def add_empty_cluster(self, idx):
+        self[idx] = HybridCluster(idx, None)
+
+    def remove_cluster(self, idx):
+        del self.__mem__[idx]
+
+
 class Phy:
     """ Phy class that exposes spike sorting results and manual curation
     information

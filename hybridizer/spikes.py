@@ -40,9 +40,7 @@ class SpikeTrain:
         self.spikes = spike_times
         self.template = template
 
-        if template_fitting is not None:
-            self._template_fitting = template_fitting
-            self._fitting_energy = template_fitting**2
+        self._template_fitting = template_fitting
 
         self._energy_sorted_idxs = None
         self._PSNR = None
@@ -51,8 +49,9 @@ class SpikeTrain:
         """ Calculate a template for this spike train for the given discrete
         window size
         """
-        self.template = Template(from_import=from_import, zf_frac=zf_frac)
-        self.template.calculate_from_spike_train(self, window_size)
+        if self.template is None:
+            self.template = Template(from_import=from_import, zf_frac=zf_frac)
+            self.template.calculate_from_spike_train(self, window_size)
 
     def get_nb_spikes(self):
         """ Return the number of spikes in the spike train
@@ -62,8 +61,10 @@ class SpikeTrain:
     def fit_spikes(self):
         """ Calculate spike fits
         """
+        if self._template_fitting is not None:
+            return
+
         self._template_fitting = np.zeros(self.spikes.shape)
-        self._fitting_energy = np.zeros(self.spikes.shape)
 
         for idx, spike in enumerate(self.spikes):
             start, end = self.get_spike_start_end(spike)
@@ -73,8 +74,8 @@ class SpikeTrain:
             temp_fit = self.template._fit_template(chunk)
 
             self._template_fitting[idx] = temp_fit
-            # fitting energy only based on template
-            self._fitting_energy[idx] = temp_fit**2
+
+        self._template_fitting[self._template_fitting < 0] = 0
 
         # important to reset the energy sorted idxs on a new fit
         self._energy_sorted_idxs = None
@@ -139,7 +140,7 @@ class SpikeTrain:
         This method requires that the fitting factors have been initialized.
         """
         if self._energy_sorted_idxs is None:
-            self._energy_sorted_idxs = np.argsort(self._fitting_energy)
+            self._energy_sorted_idxs = np.argsort(self._template_fitting)
 
         return self._energy_sorted_idxs
 
@@ -153,9 +154,9 @@ class SpikeTrain:
     def get_energy_sorted_fittings(self):
         return self._template_fitting[self.get_energy_sorted_idxs()]
 
-    def get_automatic_energy_bounds(self, C=0.75):
+    def get_automatic_energy_bounds(self, C=0.5):
         """ Return the lower and upper index obtained from robust
-        statistics estimated on the logarithm of the fitting energy.
+        statistics estimated on the logarithm of the template fitting.
 
         Parameters
         ----------
@@ -172,7 +173,7 @@ class SpikeTrain:
         that corresponds to Q3 + C * IQR.
         """
         # log space is considered to excluded values close to zero
-        pcts = np.percentile(np.log10(self._fitting_energy), [25.0, 75.0])
+        pcts = np.percentile(np.log10(self._template_fitting), [25.0, 75.0])
 
         Q1 = pcts[0]
         Q3 = pcts[1]
@@ -182,7 +183,7 @@ class SpikeTrain:
         lower_bound = Q1 - C * IQR
         upper_bound = Q3 + C * IQR
 
-        energy_sorted_energy = np.log10(self._fitting_energy)[self.get_energy_sorted_idxs()]
+        energy_sorted_energy = np.log10(self._template_fitting)[self.get_energy_sorted_idxs()]
 
         try:
             lower_idx = np.where(energy_sorted_energy < lower_bound)[0].max()
@@ -256,6 +257,12 @@ class SpikeTrain:
 
         # PSNR altered, so reset the PSNR
         self._PSNR = None
+
+    def forget_recording(self):
+        self.recording = None
+
+    def add_recording(self, recording):
+        self.recording = recording
 
 class Template:
     """ Template class

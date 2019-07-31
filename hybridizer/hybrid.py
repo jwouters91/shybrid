@@ -47,6 +47,23 @@ class HybridCluster:
         """
         self.__ops.pop().undo()
 
+    def forget_recording(self):
+        """ Forget all recording references in this hybrid cluster
+        """
+        if self.root is not None:
+            self.root.forget_recording()
+
+        for ops in self.__ops:
+            ops.spike_train.forget_recording()
+
+    def add_recording(self, recording):
+        """ Add the recording references to all spike trains in this cluster
+        """
+        if self.root is not None:
+            self.root.add_recording(recording)
+
+        for ops in self.__ops:
+            ops.spike_train.add_recording(recording)
 
 """ Hybridization operators
 """
