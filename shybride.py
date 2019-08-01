@@ -5,7 +5,7 @@ Created on Fri Sep 28 13:36:01 2018
 
 @author: Jasper Wouters
 
-SHY BRIDE
+SHYBRID
 Copyright (C) 2018  Jasper Wouters
 
 This program is free software: you can redistribute it and/or modify
@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import sys
 import os
 import yaml
+import pickle
 
 from PyQt5 import QtWidgets, QtCore
 
@@ -37,9 +38,11 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
 from hybridizer.ui import design, import_template, insert_template
-from hybridizer.io import Recording, SpikeClusters, Phy, RectangularProbe
-from hybridizer.spikes import SpikeTrain
+from hybridizer.io import Recording, SpikeClusters, Phy
+from hybridizer.probes import RectangularProbe
+from hybridizer.spikes import SpikeTrain, Template
 from hybridizer.threads import TemplateWorker, ActivationWorker, MoveWorker
+from hybridizer.hybrid import Insert
 
 
 class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
@@ -54,7 +57,10 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
     INACTIVE_COLOR = 'gray'
     FLAT_COLOR = 'lightgray'
     MARKER_COLOR = 'darkslategray'
-    COLOR_MAP = 'winter'
+#    COLOR_MAP = 'winter'
+    COLOR_MAP = 'rainbow'
+
+    HISTORY_DUMP = ".history.dump"
 
     def __init__(self, parent=None):
         # setup UI
@@ -81,7 +87,7 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         self.btnMagic.clicked.connect(self.auto_hybrid)
 
         self.radioTemplate.clicked.connect(lambda: self.draw_template(calcTemp=False))
-        self.zeroForceFraction.valueChanged.connect(lambda: self.draw_template(calcTemp=True))
+        self.zeroForceFraction.valueChanged.connect(self.update_zero_force_fraction)
 
         self.radioFit.clicked.connect(self.template_fit)
         self.btnLeftSpike.clicked.connect(self.lower_spike)
@@ -97,14 +103,18 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         self.btnMoveDown.clicked.connect(self.move_down)
         self.btnReset.clicked.connect(self.move_template)
         self.checkHeatMap.clicked.connect(self.toggle_heat_map)
+        self.checkCustomSNR.clicked.connect(self.toggle_custom_snr)
         self.btnMove.clicked.connect(self.execute_move)
 
         self.btnResetZoom.clicked.connect(self.reset_view_plot)
         self.btnZoom.clicked.connect(self.zoom_plot)
         self.btnPan.clicked.connect(self.pan_plot)
+        self.btnSave.clicked.connect(self.save_plot)
 
         self.btnTemplateExport.clicked.connect(self.export_template)
         self.btnTemplateImport.clicked.connect(self.import_template)
+
+        self.btnUndo.clicked.connect(self.undo_move)
 
     def create_plotting_area(self):
         """ create and set up main plotting area
@@ -189,7 +199,7 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
     def print_legal(self):
         """ print license related information
         """
-        note = 'SHY BRIDE  Copyright (C) 2018  Jasper Wouters\n'\
+        note = 'SHYBRID  Copyright (C) 2019  Jasper Wouters\n'\
                'This program comes with ABSOLUTELY NO WARRANTY. '\
                'This is free software, and you are welcome to redistribute it '\
                'under certain conditions.'
@@ -261,26 +271,31 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
                 clus_params = config['clusters']
 
                 try:
-                    for clus_mode in clus_params.keys():
-                        # load cluster information from phy
-                        if clus_mode == 'phy':
-                            phy = Phy(clus_params[clus_mode])
-                            self.clusters = SpikeClusters()
-                            self.clusters.fromPhy(phy)
-                            info_msg = 'The supplied prior spike sorting'\
-                                'information contains 0 clusters marked'\
-                                'as good.'
-                        # load cluster information from csv
-                        elif clus_mode == 'csv':
-                            self.clusters = SpikeClusters()
-                            self.clusters.fromCSV(clus_params[clus_mode])
-                            info_msg = 'The supplied prior spike sorting'\
-                                'information contains 0 clusters.'
-
-                        if len(self.clusters.keys()) == 0:
-                            QtWidgets.QMessageBox.information(self,
-                                                              'no clusters found',
-                                                              info_msg)
+                    if os.path.isfile(self._get_dump_fn()):
+                        self.load_history()
+                        print('# found and reusing cluster dump')
+                    else:
+                        for clus_mode in clus_params.keys():
+                            # load cluster information from phy
+                            if clus_mode == 'phy':
+                                phy = Phy(clus_params[clus_mode])
+                                self.clusters = SpikeClusters()
+                                self.clusters.fromPhy(phy, self.recording)
+                                info_msg = 'The supplied prior spike sorting'\
+                                    'information contains 0 clusters marked'\
+                                    'as good.'
+                            # load cluster information from csv
+                            elif clus_mode == 'csv':
+                                self.clusters = SpikeClusters()
+                                self.clusters.fromCSV(clus_params[clus_mode],
+                                                      self.recording)
+                                info_msg = 'The supplied prior spike sorting'\
+                                    'information contains 0 clusters.'
+    
+                            if len(self.clusters.keys()) == 0:
+                                QtWidgets.QMessageBox.information(self,
+                                                                  'no clusters found',
+                                                                  info_msg)
                 except Exception as e:
                     # throw message box for unexpected errors
                     QtWidgets.QMessageBox.critical(self, 'unexpected error',
@@ -294,12 +309,10 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
                 self.fill_cluster_dropdown()
 
                 # init probe model used for template import
+                # TODO integrate with regular probe model
                 self.connected_probe = RectangularProbe()
                 self.connected_probe.fill_channels(self.recording.probe.geometry)
                 self.connected_probe.connect_channels()
-
-                # init generated GT
-                self.generated_GT = SpikeClusters()
 
                 self.reset_GUI_initial()
 
@@ -323,6 +336,11 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
 
         self.listClusterSelect.clear()
         self.listClusterSelect.addItems(self.good_clusters)
+
+        # apply appropriate color
+        for cluster in good_clusters:
+            self.paint_cluster_list(cluster_idx=cluster)
+
 
     def clear_cluster_dropdown(self):
         """ Clear the cluster dropdown menu
@@ -393,33 +411,31 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
                 self.execute_move()
                 self.magicEventLoop.exec()
 
-
     """
     Methods related to the template only view
     """
+    # TODO split this function over different functions, too much functionality
     def draw_template(self, calcTemp=True, template=None, spike_train=None):
         """ (Calculate and) draw template
         """
+        # TODO move to API
+        self.paint_cluster_list()
+
         # if no given window size or invalid window size, raise error message
         if self.is_window_size_valid():
             if calcTemp and template is None:
                 self.disable_GUI(msg='estimating template')
 
-                if self._current_cluster in self.generated_GT.keys():
-                    spike_times = self.generated_GT[self._current_cluster]
-                else:
-                    # use external
-                    spike_times = self.clusters[self._current_cluster]
-                self.spikeTrain = SpikeTrain(self.recording, spike_times)
+                self.spikeTrain = self.clusters[self._current_cluster].get_actual_spike_train()
 
                 # calculate template
                 self._window_samples = int(np.ceil(float(self.fieldWindowSize.text()) / 1000 * self.recording.sampling_rate))
-                zf_frac = self.zeroForceFraction.value() / 100
 
                 # transfer data to worker
                 self.templateWorker.spike_train = self.spikeTrain
                 self.templateWorker.window_size = self._window_samples
-                self.templateWorker.zf_frac = zf_frac
+                self.templateWorker.zf_frac = self.convert_zero_force_fraction()
+                self.templateWorker.is_hybrid = self.cluster_is_hybrid()
 
                 self.templateWorker.start()
 
@@ -427,6 +443,16 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
                 return
 
             elif spike_train is not None:
+                window = spike_train.template.get_template_data().shape[1]
+                if self._window_samples != window:
+                    # throw warning
+                    QtWidgets.QMessageBox.information(self, 'window size warning',
+                                                      'The template window size for a hybrid cluster can not be altered.')
+
+                    # change window size field
+                    real_window = window / self.recording.sampling_rate * 1000
+                    self.fieldWindowSize.setText(str(real_window))
+
                 # finish multi threaded job
                 self.spikeTrain = spike_train
                 self.reset_energy_bounds()
@@ -435,17 +461,21 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
 
             # use provided template instead of data derived one
             elif template is not None:
-                self.spikeTrain = SpikeTrain(self.recording, np.array([]))
-                # if template is given through import overwrite
-                self.spikeTrain.calculate_template(from_import=True)
+                imported_template = Template(data=template, from_import=True)
+                self.spikeTrain = SpikeTrain(self.recording, np.array([]),
+                                             template=imported_template)
 
-                # overwrite data
-                self.spikeTrain.template.data = template
-                self.spikeTrain.template.window_size = template.shape[1]
+            elif not self.import_mode_active():
+                self.spikeTrain = self.clusters[self._current_cluster].get_actual_spike_train()
+
+            # spike train updated
+            self.enable_disable_undo()
+
+            print('# PSNR for current spike train = {}'.format(self.spikeTrain.get_PSNR()))
 
             # draw template
             self.axes.clear()
-            self._template_scaling = self.plot_multichannel(self.spikeTrain.template.data)
+            self._template_scaling = self.plot_multichannel(self.spikeTrain.template.get_template_data())
             self.axes.autoscale(False)
 
             # add callbacks
@@ -465,10 +495,13 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
             self.btnTemplateExport.setEnabled(True)
 
             self.radioMove.setEnabled(True) # we opted for eternal program flow
-            if self._current_cluster in self.generated_GT.keys():
-                self.plotTitle.setText('Cluster {} [ALREADY MOVED]'.format(self._current_cluster))
+
+            if self.import_mode_active():
+                self.plotTitle.setText('Imported template')
+            elif self.cluster_is_hybrid():
+                self.plotTitle.setText('Cluster {} (SNR: {:.2f} dB) [ALREADY MOVED]'.format(self._current_cluster, self.spikeTrain.get_PSNR()))
             else:
-                self.plotTitle.setText('Cluster {}'.format(self._current_cluster))
+                self.plotTitle.setText('Cluster {} (SNR: {:.2f} dB)'.format(self._current_cluster, self.spikeTrain.get_PSNR()))
 
             self.set_template_fit_enabled(False)
             self.set_move_template_enabled(False)
@@ -482,6 +515,25 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         self.zeroForceFraction.lineEdit().deselect()
         self.zeroForceLabel.setEnabled(enabled)
 
+    def update_zero_force_fraction(self):
+        """ Update zero force fraction
+        """
+        # update the zero force fraction
+        zf_frac = self.convert_zero_force_fraction()
+        self.spikeTrain.template.update_zf_frac(zf_frac)
+
+        # recalculate the fitting factors
+        self.spikeTrain.fit_spikes()
+
+        # reset the fitting factor bounds
+        self.reset_energy_bounds()
+
+        self.draw_template(calcTemp=False)
+
+    def convert_zero_force_fraction(self):
+        """ Return the zero force fraction in the backend format
+        """
+        return self.zeroForceFraction.value() / 100
 
     """ 
     Methods related to the template fit view
@@ -543,7 +595,7 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
 
         self.plot_multichannel(spike, color=self.SPIKE_COLOR,
                                scaling=self._template_scaling/fit)
-        self.plot_multichannel(self.spikeTrain.template.data)
+        self.plot_multichannel(self.spikeTrain.template.get_template_data())
 
     def lower_spike(self):
         """ Lower current spike index
@@ -649,8 +701,29 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         self.btnMoveRight.setEnabled(enabled)
         self.btnMoveDown.setEnabled(enabled)
         self.checkHeatMap.setEnabled(enabled)
+        self.checkCustomSNR.setEnabled(enabled)
 
-        self.btnMove.setEnabled(False)
+        try:
+            template_imported = self.spikeTrain.template.imported
+        except:
+            print('imported template does not exist yet')
+            template_imported = False
+
+        # enable SNR spinbox only if the checkbox is checked
+        if template_imported:
+            self.checkCustomSNR.setEnabled(False)
+            self.spinSNR.setEnabled(False)
+        elif self.checkCustomSNR.isChecked():
+            self.spinSNR.setEnabled(enabled)
+        else:
+            self.spinSNR.setEnabled(False)
+
+        if enabled and template_imported:
+            print("enabling move button")
+            self.btnMove.setEnabled(True)
+        else:
+            self.btnMove.setEnabled(False)
+
         self.btnReset.setEnabled(False)
 
         if not enabled:
@@ -661,9 +734,10 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         """
         self.clear_canvas()
 
-        self.spikeTrain.template.calculate_shifted_template(self.spikeTrain,
-                                                            self.x_shift,
-                                                            self.y_shift)
+        self.shifted_template =\
+            self.spikeTrain.template.get_shifted_template(self.spikeTrain,
+                                                          self.x_shift,
+                                                          self.y_shift)
 
         # act on worker thread results
         if activations is not None:
@@ -684,19 +758,28 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
 
         if self.checkHeatMap.isChecked():
             norm_activations = self.activations / self.activations.max()
-            self.plot_multichannel(self.spikeTrain.template.shifted_template,
+            self.plot_multichannel(self.shifted_template.get_template_data(),
                                    scaling=self._template_scaling,
                                    activations=norm_activations)
         else:
-            self.plot_multichannel(self.spikeTrain.template.shifted_template,
+            self.plot_multichannel(self.shifted_template.get_template_data(),
                                    color=self.TEMPLATE_COLOR,
                                    scaling=self._template_scaling)
 
         self.show_color_bar(self.checkHeatMap.isChecked())
 
+    def toggle_custom_snr(self):
+        """ Toggle the custom SNR spinbox
+        """
+        if self.checkCustomSNR.isChecked():
+            self.spinSNR.setEnabled(True)
+        else:
+            self.spinSNR.setEnabled(False)
+
     def toggle_heat_map(self):
         """ Toggle spike count heatmap in move template view
         """
+        # TODO argument should be passed instead of relying on internals
         self.render_shifted_template()
 
     def show_color_bar(self, show, show_labels=True):
@@ -720,22 +803,32 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
             self.axes_color.figure.patch.set_facecolor(bg_color)
             self.axes_color.figure.canvas.draw()
 
+    def calculate_move_scaling(self):
+        desired_scaling = np.sqrt(10**(self.spinSNR.value()/10))
+        
+        actual_PSNR = self.clusters[self._current_cluster].get_actual_spike_train().get_PSNR()
+        actual_scaling = np.sqrt(10**(actual_PSNR/10))
+
+        scaling_correction_factor = desired_scaling / actual_scaling
+
+        return scaling_correction_factor
+
     def execute_move(self):
         """ Move shifted template in the data
         """
-        # check if regular or input mode
-        if self.radioFit.isEnabled():
+        if not self.import_mode_active():
             self.disable_GUI(msg='moving template')
 
-            self.moveWorker.recording = self.recording
-            self.moveWorker.spike_train = self.spikeTrain
-            self.moveWorker.generated_GT = self.generated_GT
+            self.moveWorker.cluster = self.clusters[self._current_cluster]
+            self.moveWorker.shifted_template = self.shifted_template
 
-            self.moveWorker.current_cluster = self._current_cluster
             self.moveWorker.energy_LB = self._energy_LB
             self.moveWorker.energy_UB = self._energy_UB
-            self.moveWorker.window_size = self._window_samples
-            self.moveWorker.dump_path = self._select_path
+
+            if self.checkCustomSNR.isChecked():
+                self.moveWorker.target_PSNR = self.spinSNR.value()
+            else:
+                self.moveWorker.target_PSNR = None
 
             self.moveWorker.start()
             return
@@ -744,21 +837,102 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
             # insert template
             self.build_insert_dialog()
 
-    def move_finished(self, spike_train, generated_GT):
-        self.spikeTrain = spike_train
-        self.generated_GT = generated_GT
+    def move_finished(self):
+        self.spikeTrain = self.clusters[self._current_cluster].get_actual_spike_train()
 
         self.reset_energy_bounds()
 
-        # repaint choice in cluster list
-        idx = self.listClusterSelect.findText(str(int(self._current_cluster)))
-        self.listClusterSelect.model().item(idx).setForeground(QtCore.Qt.gray)
+        self.dump_ground_truth()
 
         self.enable_GUI()
 
         self.draw_template(calcTemp=False)
 
         self.magicEventLoop.exit()
+
+    def undo_move(self):
+        """ Undo the last spike train relocation
+        """
+        # TODO implement multithreaded
+        self.reset_energy_bounds()
+
+        self.disable_GUI()
+
+        # undo the last insertion        
+        self.clusters[self._current_cluster].undo_last_operator()
+        try:
+            # undo the last subtraction
+            self.clusters[self._current_cluster].undo_last_operator()
+            deleted_cluster = False
+        except IndexError:
+            # remove cluster from memory
+            self.clusters.remove_cluster(self._current_cluster)
+            deleted_cluster = True
+
+            list_idx = self.listClusterSelect.findText(str(int(self._current_cluster)))
+            self.listClusterSelect.removeItem(list_idx)
+            self.listClusterSelect.setCurrentIndex(0)
+
+            self._current_cluster = None
+
+        self.dump_ground_truth()
+
+        self.enable_GUI()
+
+        if deleted_cluster:
+            self.reset_GUI_initial()
+        else:
+            self.draw_template(calcTemp=False)
+
+    def enable_disable_undo(self):
+        """ check whether has to be enabled/disabled for the current cluster
+        """
+        if self.cluster_is_hybrid() and not self.import_mode_active():
+            self.btnUndo.setEnabled(True)
+        else:
+            self.btnUndo.setEnabled(False)
+
+    def cluster_is_hybrid(self, cluster_idx=None):
+        """ Return whether or not the given cluster is a hybrid clusters. If given
+        cluster idx is None, the current cluster is checked instead.
+        """
+        if cluster_idx is None:
+            if self._current_cluster is None:
+                return False
+            return self.clusters[self._current_cluster].is_hybrid()
+        else:
+            return self.clusters[cluster_idx].is_hybrid()
+
+    def dump_ground_truth(self):
+        """ Dump ground truth labels
+        """
+        csv_path = os.path.join(self._select_path, 'hybrid_GT.csv')
+        print('# updated ground truth in {}'.format(csv_path))
+        self.clusters.dumpCSV(csv_path)
+
+        # also dump the history
+        self.dump_history()
+
+    def paint_cluster_list(self, cluster_idx=None):
+        """ Update the color of the given cluster idx in clusters list. If given
+        cluster idx is None, the current cluster is painted instead.
+        """
+        # convert cluster idx to list idx
+        if cluster_idx is None:
+            if self._current_cluster is None:
+                return
+            list_idx = self.listClusterSelect.findText(str(int(self._current_cluster)))
+        else:
+            list_idx = self.listClusterSelect.findText(str(int(cluster_idx)))
+
+        # choose appropriate color
+        if self.cluster_is_hybrid(cluster_idx=cluster_idx):
+            color = QtCore.Qt.gray
+        else:
+            color = QtCore.Qt.black
+
+        # change color
+        self.listClusterSelect.model().item(list_idx).setForeground(color)
 
 
     """
@@ -826,16 +1000,22 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
                                                   directory=self._select_path,
                                                   filter='CSV (*.csv)')
 
-
         if export_path != '':
-            # convert channels to good channels
-            export_template = self.spikeTrain.template.data[channels.astype(np.int)]
+            export_path = self.force_extension(export_path, extension='.csv')
+
+            export_template = self.spikeTrain.template.get_template_data()[channels.astype(np.int)]
 
             # normalize template before exporting
             export_template = export_template / export_template.std()
 
             # dump csv
             np.savetxt(export_path, export_template, delimiter=',')
+
+    def force_extension(self, path, extension='.csv'):
+        """ Force a given path to a certain extension
+        """
+        root, _ = os.path.splitext(path)
+        return root + extension
 
 
     """
@@ -893,9 +1073,18 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         x_reach = self.importTemplateDialog.boxReach.value()
         x_offset = self.importTemplateDialog.boxOffset.value()
 
-        mapped_channels =\
-            self.connected_probe.get_channels_from_zone(self.imported_template.shape[0],
-                                                        x_reach, x_offset)
+        print('values read')
+
+        try:
+            mapped_channels =\
+                self.connected_probe.get_channels_from_zone(self.imported_template.shape[0],
+                                                            x_reach, x_offset)
+
+        except Exception as e:
+            self.importTemplateContainer.close()
+            QtWidgets.QMessageBox.critical(self, 'parameter error', str(e))
+            self.import_template = None
+            return
 
         mapped_channels = self.recording.probe.chans_to_good_chans(mapped_channels)
 
@@ -938,12 +1127,12 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
     def insert_template(self):
         """ Destroy the graphical template import dialog
         """
-        # refractory period
+        # read desired spike train characteristics
         snr = self.insertTemplateDialog.boxSNR.value()
         rate = self.insertTemplateDialog.boxRate.value()
         refr = self.insertTemplateDialog.boxRefr.value()
 
-        # poisson distribution spike times
+        # poisson process spike times
         spike = 0
         dur = self.recording.get_duration()
         beta = self.recording.sampling_rate / rate
@@ -952,62 +1141,69 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         spikes_insert = np.array([], dtype=np.int)
         while spike < dur:
             isi = np.random.exponential(scale=beta)
+            # enforce refractory period
             if isi < refr:
                 isi = refr
             spike += isi
 
             spikes_insert = np.append(spikes_insert, spike)
 
-        # scale waveform to insert
-        insert_waveform = self.spikeTrain.template.shifted_template
-        peak = np.abs(insert_waveform).max()
-        desired_peak_power = 10**(snr/10) * self.sig_power
-        insert_waveform = insert_waveform / peak * np.sqrt(desired_peak_power)
+        insert_waveform = self.spikeTrain.template.get_shifted_template(self.spikeTrain,
+                                                                        self.x_shift,
+                                                                        self.y_shift)
+
+        within_bounds = spikes_insert <  (self.spikeTrain.recording.get_duration() - insert_waveform.window_size)
+        spikes_insert = spikes_insert[within_bounds]
+
+        insert_train = SpikeTrain(self.spikeTrain.recording, spikes_insert,
+                                  template=insert_waveform,
+                                  template_fitting=np.ones(spikes_insert.shape))
+
+        insert_train.set_target_PSNR(snr)
+        train_insertion = Insert(insert_train)
+
+        # create an empty cluster
+        self._import_counter = self._import_counter + 1
+        self.clusters.add_empty_cluster(self._import_counter)
 
         self.disable_GUI()
+
         # insert scaled template
-        inserted_spikes = self.spikeTrain.insert_given_train(spikes_insert,
-                                                             insert_waveform,
-                                                             np.ones(spikes_insert.shape))
-        self.recording.flush()
+        self.clusters[self._import_counter].apply_operator(train_insertion)
+        insert_train.recording.flush()
+
         self.enable_GUI()
 
-        self.spikeTrain.update(inserted_spikes)
+        print('# {} spikes inserted'.format(int(spikes_insert.size)))
 
-        print('# {} spikes inserted'.format(int(inserted_spikes.size)))
-
-        # get counter information
-        self._import_counter = self._import_counter + 1
         self._current_cluster = self._import_counter
 
-        new_item = str(int(self._current_cluster))
-
         # add the new cluster to the dropdown and select
+        new_item = str(int(self._current_cluster))
         self.listClusterSelect.addItem(new_item)
         self.listClusterSelect.setCurrentIndex(self.listClusterSelect.findText(new_item))
 
-        self.generated_GT[self._current_cluster] = inserted_spikes
-
         print('# Inserted spikes were assigned to new cluster', new_item)
-
-        csv_path = os.path.join(self._select_path, 'hybrid_GT.csv')
-        print('# updated ground truth in {}'.format(csv_path))
-        self.generated_GT.dumpCSV(csv_path)
 
         self.insertTemplateContainer.close()
 
-        self.disable_GUI()
-        self.spikeTrain.fit_spikes()
-        self.enable_GUI()
-
+        self.spikeTrain = self.clusters[self._current_cluster].get_actual_spike_train()
         self.reset_energy_bounds()
+        self.dump_ground_truth()
 
         self.radioTemplate.setChecked(True)
         self.draw_template(calcTemp=False)
 
-        # repaint choice in cluster list
-        idx = self.listClusterSelect.findText(str(int(self._current_cluster)))
-        self.listClusterSelect.model().item(idx).setForeground(QtCore.Qt.gray)
+
+    def import_mode_active(self):
+        """ Check whether or not the app is in import mode
+        """
+        try:
+            is_imported = self.spikeTrain.template.imported
+        except:
+            is_imported = False
+
+        return is_imported
 
 
     """
@@ -1081,7 +1277,9 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         """ Plot the energy bar at the bottom of the canvas
         """
         sorted_idxs = self.spikeTrain.get_energy_sorted_idxs()
-        energy = self.spikeTrain._fitting_energy.copy()
+        # TODO revise this 
+#        energy = self.spikeTrain._fitting_energy.copy()
+        energy = self.spikeTrain._template_fitting.copy()
 
         energy = energy[sorted_idxs]
 
@@ -1176,7 +1374,6 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         if redraw:
             self.axes.figure.canvas.draw()
 
-
     def reset_view_plot(self):
         """ Reset view on canvas
         """
@@ -1200,6 +1397,11 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         if self.btnZoom.isChecked():
             self.btnZoom.setChecked(False)
 
+    def save_plot(self):
+        """ Save plot
+        """
+        self.toolbar.save_figure()
+
     def lim_changed(self, ax):
         """ Callback for keeping the energy bar tidy when zooming / dragging
         """
@@ -1210,12 +1412,35 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
     """
     Housekeeping methods
     """
+    def _get_dump_fn(self):
+        """ Return full filename to dump location 
+        """
+        return os.path.join(self._select_path, self.HISTORY_DUMP)
+
+    def dump_history(self):
+        """ Dump the history of template moves
+        """
+        # forget the recording references
+        self.clusters.forget_recording()
+
+        with open(self._get_dump_fn(), 'wb') as dump_file:
+            pickle.dump(self.clusters, dump_file)
+
+        self.clusters.add_recording(self.recording)
+
+    def load_history(self):
+        """ load history
+        """
+        with open(self._get_dump_fn(), 'rb') as dump_file:
+            self.clusters = pickle.load(dump_file)
+
+        self.clusters.add_recording(self.recording)
+
     def reset_file_session_variables(self):
         """ Reset file session variables (variables related to certain file)
         """
         self.recording = None
         self.clusters = None
-        self.generated_GT = None
 
         self._current_cluster = None
         self.spikeTrain = None
@@ -1244,6 +1469,10 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
 
         self.btnTemplateExport.setEnabled(False)
         self.btnTemplateImport.setEnabled(data_loaded)
+
+        self.enable_disable_undo()
+
+        self.plotTitle.setText('')
 
         self.reset_energy_bounds()
         self.clear_canvas(redraw=True)
@@ -1284,12 +1513,16 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         self.GUI_status['btnResetZoom'] = self.btnResetZoom.isEnabled()
         self.GUI_status['btnZoom'] = self.btnZoom.isEnabled()
         self.GUI_status['btnPan'] = self.btnPan.isEnabled()
+        self.GUI_status['btnSave'] = self.btnSave.isEnabled()
         self.GUI_status['checkHeatMap'] = self.checkHeatMap.isEnabled()
         self.GUI_status['btnTemplateImport'] = self.btnTemplateImport.isEnabled()
         self.GUI_status['btnTemplateExport'] = self.btnTemplateExport.isEnabled()
         self.GUI_status['zeroForceFraction'] = self.zeroForceFraction.isEnabled()
         self.GUI_status['btnMagic'] = self.btnMagic.isEnabled()
         self.GUI_status['zeroForceLabel'] = self.zeroForceLabel.isEnabled()
+        self.GUI_status['btnUndo'] = self.btnUndo.isEnabled()
+        self.GUI_status['checkCustomSNR'] = self.checkCustomSNR.isEnabled()
+        self.GUI_status['spinSNR'] = self.spinSNR.isEnabled()
 
     def disable_GUI(self, msg=None):
         """ Disable GUI
@@ -1329,12 +1562,16 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
             self.btnResetZoom.setEnabled(False)
             self.btnZoom.setEnabled(False)
             self.btnPan.setEnabled(False)
+            self.btnSave.setEnabled(False)
             self.checkHeatMap.setEnabled(False)
             self.btnTemplateImport.setEnabled(False)
             self.btnTemplateExport.setEnabled(False)
             self.zeroForceFraction.setEnabled(False)
             self.btnMagic.setEnabled(False)
             self.zeroForceLabel.setEnabled(False)
+            self.btnUndo.setEnabled(False)
+            self.checkCustomSNR.setEnabled(False)
+            self.spinSNR.setEnabled(False)
 
             # force repainting of entire GUI
             self.repaint()
@@ -1356,16 +1593,21 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         self.btnMoveRight.setEnabled(self.GUI_status['btnMoveRight'])
         self.btnMoveDown.setEnabled(self.GUI_status['btnMoveDown'])
         self.btnReset.setEnabled(self.GUI_status['btnReset'])
+        self.btnMove.setEnabled(self.GUI_status['btnMove'])
         self.horizontalSlider.setEnabled(self.GUI_status['horizontalSlider'])
         self.btnResetZoom.setEnabled(self.GUI_status['btnResetZoom'])
         self.btnZoom.setEnabled(self.GUI_status['btnZoom'])
         self.btnPan.setEnabled(self.GUI_status['btnPan'])
+        self.btnSave.setEnabled(self.GUI_status['btnSave'])
         self.checkHeatMap.setEnabled(self.GUI_status['checkHeatMap'])
         self.btnTemplateImport.setEnabled(self.GUI_status['btnTemplateImport'])
         self.btnTemplateExport.setEnabled(self.GUI_status['btnTemplateExport'])
         self.zeroForceFraction.setEnabled(self.GUI_status['zeroForceFraction'])
         self.btnMagic.setEnabled(self.GUI_status['btnMagic'])
         self.zeroForceLabel.setEnabled(self.GUI_status['zeroForceLabel'])
+        self.btnUndo.setEnabled(self.GUI_status['btnUndo'])
+        self.checkCustomSNR.setEnabled(self.GUI_status['checkCustomSNR'])
+        self.spinSNR.setEnabled(self.GUI_status['spinSNR'])
 
         self.progressBar.setMaximum(1)
         self.progressBar.setEnabled(False)

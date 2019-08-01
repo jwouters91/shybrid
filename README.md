@@ -76,6 +76,8 @@ clusters:
 ...
 ```
 
+To start the creation of hybrid ground truth data, the binary recording data has to be selected first. This can be done by clicking the \emph{select data} button, as shown in Fig. \ref{fig:temp_set}. The application will load all the other input files and parameters automatically from the parameter file. Note that the tool operates directly on the supplied recording file, so make sure to keep a copy of your original recording away from the SHY BRIDE.
+
 ### Exporting template
 A template can exported as a CSV file. Every channel is exported as a row in the CSV dump. The order in which the channels are exported is depending on the order of the channels in the probe file. For proper reconstruction, the channels in the probe file should be order based on the actual geometry. More concretely, channels are assumed to be ordered by increasing x- and increasing y-coordinates, with the x-coordinate being the fastest changing variable.
 

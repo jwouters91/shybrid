@@ -67,7 +67,7 @@ class Ui_DialogTemplateImport(object):
 
     def retranslateUi(self, DialogTemplateImport):
         _translate = QtCore.QCoreApplication.translate
-        DialogTemplateImport.setWindowTitle(_translate("DialogTemplateImport", "Import template"))
+        DialogTemplateImport.setWindowTitle(_translate("DialogTemplateImport", "import template"))
         self.btnSelectTemplate.setText(_translate("DialogTemplateImport", "Select template"))
         self.label_2.setText(_translate("DialogTemplateImport", "horizontal reach"))
         self.label_4.setText(_translate("DialogTemplateImport", "(channels)"))

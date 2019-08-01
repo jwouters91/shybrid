@@ -72,7 +72,7 @@ class Ui_DialogInsertTemplate(object):
 
     def retranslateUi(self, DialogInsertTemplate):
         _translate = QtCore.QCoreApplication.translate
-        DialogInsertTemplate.setWindowTitle(_translate("DialogInsertTemplate", "Dialog"))
+        DialogInsertTemplate.setWindowTitle(_translate("DialogInsertTemplate", "insert template"))
         self.label_9.setText(_translate("DialogInsertTemplate", "refractory period"))
         self.label_10.setText(_translate("DialogInsertTemplate", "(Hz)"))
         self.label_11.setText(_translate("DialogInsertTemplate", "(ms)"))
