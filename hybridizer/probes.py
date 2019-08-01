@@ -376,14 +376,22 @@ class RectangularProbe:
         if x_offset > 0:
             # walk to right
             for _ in range(x_offset):
-                    current_channel = current_channel.right
+                current_channel = current_channel.right
 
         # walk right to left in this row
         walk_right = x_reach - x_offset
 
-        while not output_idxs.size == nb_channels:
-            while walk_right:
-                output_idxs = np.append(output_idxs, current_channel.channel)
+        keep_walking = True
+        while keep_walking:
+            # walk to the right on current row
+            while walk_right > 0:
+                # only add real channel
+                if current_channel.channel is not None:
+                    output_idxs = np.append(output_idxs, current_channel.channel)
+                if output_idxs.size == nb_channels:
+                    keep_walking = False
+                    # break from inner loop
+                    break
 
                 current_channel = current_channel.right
                 walk_right -= 1
@@ -391,14 +399,13 @@ class RectangularProbe:
             # update to next_row
             current_channel = next_row
 
-            if not current_channel is None:
+            if current_channel is not None:
                 next_row = current_channel.upper
                 walk_right = x_reach
 
             # no more channels left
             else:
-                # complete with None till desired size is reach
-                output_idxs = np.append(output_idxs, None)
+                break
 
         # return the raw data channels for this zone
         return output_idxs

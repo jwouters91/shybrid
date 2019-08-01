@@ -420,7 +420,6 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         """
         # TODO move to API
         self.paint_cluster_list()
-        self.enable_disable_undo()
 
         # if no given window size or invalid window size, raise error message
         if self.is_window_size_valid():
@@ -436,6 +435,7 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
                 self.templateWorker.spike_train = self.spikeTrain
                 self.templateWorker.window_size = self._window_samples
                 self.templateWorker.zf_frac = self.convert_zero_force_fraction()
+                self.templateWorker.is_hybrid = self.cluster_is_hybrid()
 
                 self.templateWorker.start()
 
@@ -443,6 +443,16 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
                 return
 
             elif spike_train is not None:
+                window = spike_train.template.get_template_data().shape[1]
+                if self._window_samples != window:
+                    # throw warning
+                    QtWidgets.QMessageBox.information(self, 'window size warning',
+                                                      'The template window size for a hybrid cluster can not be altered.')
+
+                    # change window size field
+                    real_window = window / self.recording.sampling_rate * 1000
+                    self.fieldWindowSize.setText(str(real_window))
+
                 # finish multi threaded job
                 self.spikeTrain = spike_train
                 self.reset_energy_bounds()
@@ -457,6 +467,9 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
 
             elif not self.import_mode_active():
                 self.spikeTrain = self.clusters[self._current_cluster].get_actual_spike_train()
+
+            # spike train updated
+            self.enable_disable_undo()
 
             print('# PSNR for current spike train = {}'.format(self.spikeTrain.get_PSNR()))
 
@@ -874,7 +887,7 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
     def enable_disable_undo(self):
         """ check whether has to be enabled/disabled for the current cluster
         """
-        if self.cluster_is_hybrid():
+        if self.cluster_is_hybrid() and not self.import_mode_active():
             self.btnUndo.setEnabled(True)
         else:
             self.btnUndo.setEnabled(False)
@@ -1059,6 +1072,8 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         """
         x_reach = self.importTemplateDialog.boxReach.value()
         x_offset = self.importTemplateDialog.boxOffset.value()
+
+        print('values read')
 
         try:
             mapped_channels =\

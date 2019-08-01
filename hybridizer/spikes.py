@@ -49,9 +49,8 @@ class SpikeTrain:
         """ Calculate a template for this spike train for the given discrete
         window size
         """
-        if self.template is None:
-            self.template = Template(from_import=from_import, zf_frac=zf_frac)
-            self.template.calculate_from_spike_train(self, window_size)
+        self.template = Template(from_import=from_import, zf_frac=zf_frac)
+        self.template.calculate_from_spike_train(self, window_size)
 
     def get_nb_spikes(self):
         """ Return the number of spikes in the spike train
@@ -61,9 +60,6 @@ class SpikeTrain:
     def fit_spikes(self):
         """ Calculate spike fits
         """
-        if self._template_fitting is not None:
-            return
-
         self._template_fitting = np.zeros(self.spikes.shape)
 
         for idx, spike in enumerate(self.spikes):

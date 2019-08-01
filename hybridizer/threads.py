@@ -40,11 +40,12 @@ class TemplateWorker(QThread):
         QThread.__init__(self)
 
     def run(self):
-        # calculate template
-        self.spike_train.calculate_template(self.window_size,
-                                            zf_frac=self.zf_frac)
-        # calculate fit factors
-        self.spike_train.fit_spikes()
+        if not self.is_hybrid:
+            # calculate template
+            self.spike_train.calculate_template(self.window_size,
+                                                zf_frac=self.zf_frac)
+            # calculate fit factors
+            self.spike_train.fit_spikes()
 
         self.template_ready.emit(self.spike_train)
 
