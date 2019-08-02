@@ -362,7 +362,7 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         """ validate the window size
         """
         try:
-            float(self.fieldWindowSize.text())
+            window_size = float(self.fieldWindowSize.text())
             window_is_float = True
         except:
             window_is_float = False
@@ -377,6 +377,11 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
              QtWidgets.QMessageBox.critical(self, 'Invalid window size',
                                             'Please provide a valid spike window size.')
              return False
+
+        elif window_size <= 0:
+            QtWidgets.QMessageBox.critical(self, 'Invalid window size',
+                                           'Please provide a strictly positive window size.')
+            return False
 
         return True
 
@@ -706,7 +711,6 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         try:
             template_imported = self.spikeTrain.template.imported
         except:
-            print('imported template does not exist yet')
             template_imported = False
 
         # enable SNR spinbox only if the checkbox is checked
@@ -719,7 +723,6 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
             self.spinSNR.setEnabled(False)
 
         if enabled and template_imported:
-            print("enabling move button")
             self.btnMove.setEnabled(True)
         else:
             self.btnMove.setEnabled(False)
