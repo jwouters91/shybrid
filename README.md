@@ -1,9 +1,9 @@
 # SHYBRID README
-SHYBRID is a graphical user interface that allows for the easy creation of hybrid ground truth extracellular recordings.
+SHYBRID is a graphical user interface that allows for the easy creation of hybrid ground truth extracellular recordings. This README file contains information on how to install the program, as well as information on how to get started making extracellular spiking ground truth data. If you have any further questions feel free to contact [me](mailto:jasper.wouters@esat.kuleuven.be).
 
 ## Installation instructions
-1. Install miniconda (Python 3.x version) for your operaring system. Please follow the official conda.io [instructions](https://conda.io/docs/user-guide/install/index.html#regular-installation).
-2. Clone this GIT project on your local machine:
+1. Install miniconda (Python 3.x version) for your operating system. Please follow the official conda.io [instructions](https://conda.io/projects/conda/en/latest/user-guide/install/).
+2. Clone this GIT project on your local machine and change directory into the cloned folder when finished cloning:
 ```
 git clone https://gitlab.esat.kuleuven.be/Jasper.Wouters/shy.bride.git
 ```
@@ -14,37 +14,38 @@ conda create -n shybrid --file requirements
 Or use requirements_strict to enforce the exact package versions used for testing.
 4. Activate the environment:
 ```
-conda activate shybride
+conda activate shybrid
 ```
-5. Install shy bride package
+5. Install shybrid package
 ```
 pip install --editable .
 ```
-6. Run and have fun
+6. To run the application execute the following command:
 ```
-shybride.py
+shybrid.py
 ```
 
-Keep in mind that the program is only accessible from within the shybride conda environment (i.e., reactivate the environment after ,e.g., a reboot).
+Keep in mind that the program is only accessible from within the shybrid conda environment (i.e., reactivate this environment after ,e.g., a reboot).
 
 ## Updating
 Since the package is installed in editable mode, the package can be simply updated by pulling the latest version of the git master branch.
 
-## Generating hybrid data using SHYBRID
+## Getting started with generating hybrid data using SHYBRID
+Besides the information given here, more details on the methods used by the tool can be found in the [manuscript](#).
 
-### Data required
+### Prerequisites
 To generate hybrid ground truth spiking data the following files are required by the tool:
 
-* recording data in binary format (e.g. recording.bin)
+* high-pass filtered recording data in binary format (e.g. recording.bin)
 * probe file describing the recording probe geometry
-* single-unit cluster information either in
+* single-unit cluster information from a prior spike sorting either in
 	* csv format, or
 	* phy format
 * yaml-file having the same name as the recording (e.g. recording.yml) containing:
 	* binary format meta information
 		* fs: sampling frequency
-		* dtype : the datatype used to represent the data
-		* order : the order in which the data matrix is serialized (F: by stacking columns, or C: by stacking rows)
+		* dtype : the datatype used to represent the data (only signed datatypes are supported)
+		* order : the order in which the data matrix is serialized (F: by stacking matrix columns, or C: by stacking matrix rows. [more info](https://en.wikipedia.org/wiki/Row-_and_column-major_order)
 	* path to probe file
 	* path to cluster information
 
@@ -63,7 +64,7 @@ clusters:
   csv: /path/to/clusters/clusters.csv
 ...
 ```
-An example that reads single-unit cluster information directly from phy is given below:
+An example that reads single-unit cluster information directly from phy (note that the tool only considers clusters that have been marked as good clusters during a manual curation) is given below:
 
 ```
 ---
@@ -79,19 +80,35 @@ clusters:
 ...
 ```
 
-To start the creation of hybrid ground truth data, the binary recording data has to be selected first. This can be done by clicking the \emph{select data} button, as shown in Fig. \ref{fig:temp_set}. The application will load all the other input files and parameters automatically from the parameter file. Note that the tool operates directly on the supplied recording file, so make sure to keep a copy of your original recording away from the SHYBRID.
+An example dataset (with csv initial sorting results) for experimentation can be download from [here](https://cloud.esat.kuleuven.be/index.php/s/iW9gtkibJknCpos). Don't forget to complete the paths in the parameters file to correspond to the true location of the downloaded data on your local machine.
+
+### Creating a ground truth spike train the regular way
+
+1. Start the application as explained in the installation instructions.
+
+2. To start the creation of hybrid ground truth data, the binary recording data has to be selected first. This can be done by clicking the __select data__ button. The application will automatically load all the other input files and parameters from the parameter file. Note that the tool operates directly on the supplied recording file, so make sure to keep a copy of your original recordings away from the SHYBRID.
+
+3. Select a cluster from the dropdown list and choose a spike template window size. Note that for hybrid data generation the window size should be chosen sufficiently long (e.g., 5 ms). A longer window size will allow for the template to drop sufficiently close to zero at the edges of the temporal window, which is desirable to limit subtraction and insertion artefacts in the hybrid ground truth data.
+
+4. Click the __draw template__ button to visualize the spike template of the selected cluster. By altering the zero-force fraction, the number of channels that are explicitly forced to zero in the template can be altered. A higher zero force fraction will result in more channels forced to zero.
+
+5. Next, move to the inspect template fit display option. In this view mode, the user can assess how well the template fits the signal chunks that were used for the estimation of the template. You can browse through the chunks by clicking the arrow buttons or by manipulating the scoll bar below the plotting area. The chunks are ordered on increasing fitting factor (not on time). In this view, the user can choose bounds on the fitting factor. Very small and large fitting factor are likely due to overlapping spikes and should be excluded during hybridization, to guarantee realistic spike amplitudes in the ground truth data. Note that negative fitting factors are set to zero.
+
+6. After choosing bounds on the fitting factors, move to the relocate spike train view. In this view the spatial location of the spike train can be changed by clicking on the arrow buttons. Also, a custom SNR can be enforced for the final hybrid spike trains. Once a proper location is chosen, the spike train can be relocated by clicking the __(re)insert template__ button. A CSV-file containing the ground truth labels and clusters is automatically created/updated after every insertion in the folder containing the recording.
+
+7. If the resulting hybrid spike train is not satisfactory (in terms of SNR and/or location), the insertion can always be undone.
+
+The auto-hybrid function will relocate every initially provided cluster in an automatic fashion. The fitting factor bounds are then automatically chosen based on robust statistics. The new spatial location is randomly chosen.
 
 ### Exporting template
-A template can exported as a CSV file. Every channel is exported as a row in the CSV dump. The order in which the channels are exported is depending on the order of the channels in the probe file. For proper reconstruction, the channels in the probe file should be order based on the actual geometry. More concretely, channels are assumed to be ordered by increasing x- and increasing y-coordinates, with the x-coordinate being the fastest changing variable.
+A template can exported as a CSV-file. Every channel is exported as a row in the CSV dump. The order in which the channels are exported is depending on the order of the channels in the probe file. For proper reconstruction, the channels in the probe file should be order based on the actual geometry. More concretely, channels are assumed to be ordered by increasing x- and increasing y-coordinates, with the x-coordinate being the fastest changing variable.
 
 A subset of channels can be exported by using the zoom functionality. All channels which have their leftmost plotted point in the zoom window are considered for exporting.
 
 ### Importing template
-Import a template from CSV, where every row in the CSV-file represents the waveform on a channel. The window size is automatically determined.
+Import a template from CSV, where every row in the CSV-file represents the waveform on a channel. The window size is automatically determined. The horizontal reach parameter will control the width of the template on the probe. The offset parameter allows more control about which channel is used as a starting point.
 
 When working with an imported template, the inspect template fit feature will be disabled until a spatial location is chosen and the template is actually inserted in the recording.
 
-### Exporting hybrid data
-Note: the exported binary is vectorized using the C-style formatting (row-major), this independent of the format of the original data. As this might be different from the original data, the user has to keep this in mind when doing further processing.
-
-## 
+## Spike sorting performance
+Once a hybrid recording is generated, this recording can be given to your favourite spike sorting package. The obtained spike sorting results (either in CSV or PHY format) can then be compared to the hybrid ground truth labels automatically.  An example script is provided in *examples/validation_example.py*.

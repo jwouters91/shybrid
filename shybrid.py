@@ -602,8 +602,13 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         sorted_idxs = self.spikeTrain.get_energy_sorted_idxs()
         fit = self.spikeTrain._template_fitting[sorted_idxs][self._current_spike]
 
+        if fit > 0:
+            scaling = self._template_scaling/fit
+        else:
+            scaling = 0.0
+
         self.plot_multichannel(spike, color=self.SPIKE_COLOR,
-                               scaling=self._template_scaling/fit)
+                               scaling=scaling)
         self.plot_multichannel(self.spikeTrain.template.get_template_data())
 
     def lower_spike(self):
