@@ -1,6 +1,8 @@
 # SHYBRID README
 SHYBRID is a graphical user interface that allows for the easy creation of hybrid ground truth extracellular recordings. This README file contains information on how to install the program, as well as information on how to get started making extracellular spiking ground truth data. If you have any further questions feel free to contact [me](mailto:jasper.wouters@esat.kuleuven.be).
 
+Note that the tool was developed on Linux, but has also been tested on Windows and OS X. The tool is functional on both alternative OSes, but some warning errors might pop-up that seem to be harmless.
+
 ## Installation instructions
 1. Install miniconda (Python 3.x version) for your operating system. Please follow the official conda.io [instructions](https://conda.io/projects/conda/en/latest/user-guide/install/).
 2. Clone this GIT project on your local machine and change directory into the cloned folder when finished cloning:
@@ -81,7 +83,7 @@ clusters:
 ...
 ```
 
-An example dataset (with csv initial sorting results) for experimentation can be download from [here](https://cloud.esat.kuleuven.be/index.php/s/iW9gtkibJknCpos). Don't forget to complete the paths in the parameters file to correspond to the true location of the downloaded data on your local machine.
+An example dataset (with csv initial sorting results) for experimentation can be download from [here](https://cloud.esat.kuleuven.be/index.php/s/iW9gtkibJknCpos). Don't forget to complete the paths in the parameters file to correspond to the true location of the downloaded data on your local machine. Note: try to avoid spaces in the paths.
 
 ### Creating a ground truth spike train the regular way
 
@@ -107,7 +109,7 @@ A template can exported as a CSV-file. Every channel is exported as a row in the
 A subset of channels can be exported by using the zoom functionality. All channels which have their leftmost plotted point in the zoom window are considered for exporting.
 
 ### Importing template
-Import a template from CSV, where every row in the CSV-file represents the waveform on a channel. The window size is automatically determined. The horizontal reach parameter will control the width of the template on the probe. The offset parameter allows more control about which channel is used as a starting point.
+Ground truth data can also be generated in the absence of initial spike sorting results for a certain recording. Thi can be obtained by import an external template in CSV-format, where every row in the CSV-file represents the waveform on a channel. The window size is automatically determined. The horizontal reach parameter will control the width of the template on the probe. The offset parameter allows more control about which channel is used as a starting point. The template can also be shaped by adding additional zero-channels to the CSV.
 
 When working with an imported template, the inspect template fit feature will be disabled until a spatial location is chosen and the template is actually inserted in the recording.
 
