@@ -12,6 +12,7 @@ git clone https://gitlab.esat.kuleuven.be/Jasper.Wouters/shy.bride.git
 conda create -n shybrid --file requirements
 ```
 Or use requirements_strict to enforce the exact package versions used for testing.
+
 4. Activate the environment:
 ```
 conda activate shybrid
@@ -22,7 +23,7 @@ pip install --editable .
 ```
 6. To run the application execute the following command:
 ```
-shybrid.py
+python shybrid.py
 ```
 
 Keep in mind that the program is only accessible from within the shybrid conda environment (i.e., reactivate this environment after ,e.g., a reboot).
