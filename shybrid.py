@@ -516,6 +516,10 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
     def set_display_template_enabled(self, enabled):
         """ Enable or disable the display template part of the GUI
         """
+        # overwrite enabled if cluster is hybrid
+        if self.cluster_is_hybrid():
+            enabled = False
+
         self.zeroForceFraction.setEnabled(enabled)
         self.zeroForceFraction.lineEdit().deselect()
         self.zeroForceLabel.setEnabled(enabled)
@@ -1138,18 +1142,24 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         # poisson process spike times
         spike = 0
         dur = self.recording.get_duration()
-        beta = self.recording.sampling_rate / rate
-        refr = int(self.recording.sampling_rate * refr / 1000) # discretize
 
-        spikes_insert = np.array([], dtype=np.int)
-        while spike < dur:
-            isi = np.random.exponential(scale=beta)
-            # enforce refractory period
-            if isi < refr:
-                isi = refr
-            spike += isi
+        if rate > 0:
+            beta = self.recording.sampling_rate / rate
+            refr = int(self.recording.sampling_rate * refr / 1000) # discretize
 
-            spikes_insert = np.append(spikes_insert, spike)
+            spikes_insert = np.array([], dtype=np.int)
+            while spike < dur:
+                isi = np.random.exponential(scale=beta)
+                # enforce refractory period
+                if isi < refr:
+                    isi = refr
+                spike += isi
+
+                spikes_insert = np.append(spikes_insert, spike)
+        else:
+            QtWidgets.QMessageBox.critical(self, 'Invalid rate',
+                                           'The given rate should be strictly positive.')
+            return
 
         insert_waveform = self.spikeTrain.template.get_shifted_template(self.spikeTrain,
                                                                         self.x_shift,
@@ -1459,7 +1469,7 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         """ Reset GUI to initial enabled state
         """
         self.btnDraw.setEnabled(False)
-        self.btnMagic.setEnabled(True)
+        self.btnMagic.setEnabled(data_loaded)
 
         self.radioTemplate.setChecked(True)
         self.radioTemplate.setEnabled(False)
