@@ -19,7 +19,7 @@ Or use requirements_strict to enforce the exact package versions used for testin
 ```
 conda activate shybrid
 ```
-5. Install shybrid package
+5. Install shybrid package (be considerate of the trailing period in the command shown below):
 ```
 pip install --editable .
 ```
