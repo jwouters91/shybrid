@@ -1,7 +1,7 @@
 # SHYBRID README
 SHYBRID is a graphical user interface that allows for the easy creation of hybrid ground truth extracellular recordings. This README file contains information on how to install the program, as well as information on how to get started making extracellular spiking ground truth data. If you have any further questions feel free to contact [me](mailto:jasper.wouters@esat.kuleuven.be).
 
-Note that the tool was developed on Linux, but has also been tested on Windows and OS X. The tool is functional on both alternative OSes, but some warning errors might pop-up that seem to be harmless.
+Note that the tool was developed on Linux and prefereably you also run it on Linux, although it has been tested both on Windows (10) and OS X. The tool seems to be functional on both alternative operating systems, but some warnings might pop-up that seem to be harmless.
 
 ## Installation instructions
 1. Install miniconda (Python 3.x version) for your operating system. Please follow the official conda.io [instructions](https://conda.io/projects/conda/en/latest/user-guide/install/).
@@ -83,9 +83,8 @@ clusters:
 ...
 ```
 
-An example dataset (with csv initial sorting results) for experimentation can be download from [here](https://cloud.esat.kuleuven.be/index.php/s/iW9gtkibJknCpos). Don't forget to complete the paths in the parameters file to correspond to the true location of the downloaded data on your local machine. Note: try to avoid spaces in the paths.
-
 ### Creating a ground truth spike train the regular way
+An example dataset (with csv initial sorting results) for experimentation can be download from [here](https://cloud.esat.kuleuven.be/index.php/s/iW9gtkibJknCpos). Don't forget to complete the paths in the parameters file to correspond to the true location of the downloaded data on your local machine. Note: try to avoid spaces in the paths.
 
 1. Start the application as explained in the installation instructions.
 
