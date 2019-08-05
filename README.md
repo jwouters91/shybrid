@@ -7,7 +7,7 @@ Note that the tool was developed on Linux, but has also been tested on Windows a
 1. Install miniconda (Python 3.x version) for your operating system. Please follow the official conda.io [instructions](https://conda.io/projects/conda/en/latest/user-guide/install/).
 2. Clone this GIT project on your local machine and change directory into the cloned folder when finished cloning:
 ```
-git clone https://gitlab.esat.kuleuven.be/Jasper.Wouters/shy.bride.git
+https://gitlab.esat.kuleuven.be/Jasper.Wouters/shybrid.git
 ```
 3. Create a conda environment for SHYBRID:
 ```
