@@ -36,6 +36,8 @@ Since the package is installed in editable mode, the package can be simply updat
 ## Getting started with generating hybrid data using SHYBRID
 Besides the information given here, more details on the methods used by the tool can be found in the [manuscript](#).
 
+![alt text](img\screenshot.png "inspecting a template fit")
+
 ### Prerequisites
 To generate hybrid ground truth spiking data the following files are required by the tool:
 

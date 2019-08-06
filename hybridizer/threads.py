@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thu May  9 15:45:15 2019
-
-@author: Jasper Wouters
-
 SHYBRID
 Copyright (C) 2018  Jasper Wouters
 
@@ -20,7 +16,6 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 """
 
 import numpy as np
