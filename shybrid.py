@@ -816,6 +816,8 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
             self.axes_color.figure.canvas.draw()
 
     def calculate_move_scaling(self):
+        """ Transform the given SNR into a proper template scaling
+        """
         desired_scaling = np.sqrt(10**(self.spinSNR.value()/10))
         
         actual_PSNR = self.clusters[self._current_cluster].get_actual_spike_train().get_PSNR()
@@ -850,6 +852,8 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
             self.build_insert_dialog()
 
     def move_finished(self):
+        """ Complete the relocation of a spike train
+        """
         self.spikeTrain = self.clusters[self._current_cluster].get_actual_spike_train()
 
         self.reset_energy_bounds()

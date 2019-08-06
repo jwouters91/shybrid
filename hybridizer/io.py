@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Tue Sep 11 10:16:20 2018
-
-@author: Jasper Wouters
-
 SHYBRID
 Copyright (C) 2018  Jasper Wouters
 
@@ -20,7 +16,6 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 """
 
 import os
@@ -46,7 +41,8 @@ class Recording:
     preprocessed accordingly. This package does not provide support for 
     preprocessing for now.
 
-    Args:
+    Parameters
+    ----------
         fn (str): path to the binary recording
 
         probe_fn (string): path to probe file
@@ -58,11 +54,6 @@ class Recording:
         mode (str): load mode (see numpy.memmap), 'c' is (default)
 
         order (str): 'C' (row-major) or 'F' (column-major) type of binary
-
-    Attributes:
-        data (ndarray): memory-mapped numpy array where every row is a channel
-
-        sampling_rate (int): sampling rate of the data
     """
     # only signed datatypes are accepted for now, this is also the most natural
     # representation for extracellular recordings.
@@ -142,9 +133,11 @@ class Recording:
     def count_spikes(self, C=5, dur=30):
         """ Count the number of spikes on every channel
 
-        Args:
+        Parameters
+        ----------
           C (float) : Factor multiplied with channel standard deviation for
           determining the spike detection threshold
+
           dur (float) : Duration in seconds over which to calculate the
           spike detection rate
         """
@@ -186,9 +179,13 @@ class SpikeClusters:
         self.__mem__ = {}
 
     def __getitem__(self, arg):
+        """ implement square brackets syntax
+        """
         return self.__mem__[arg]
 
     def __setitem__(self, key, value):
+        """ implement square brackets syntax
+        """
         self.__mem__[key] = value
 
     def keys(self):
@@ -244,17 +241,25 @@ class SpikeClusters:
             self[cluster] = HybridCluster(cluster, spike_train)
 
     def forget_recording(self):
+        """ Forget about current recording in every cluster
+        """
         for cluster_idx in self.keys():
             self[cluster_idx].forget_recording()
 
     def add_recording(self, recording):
+        """ Add recording back to all clusters
+        """
         for cluster_idx in self.keys():
             self[cluster_idx].add_recording(recording)
 
     def add_empty_cluster(self, idx):
+        """ Add an empty cluster to the collection of clusters
+        """
         self[idx] = HybridCluster(idx, None)
 
     def remove_cluster(self, idx):
+        """ Remove a cluster from the the collection of clusters
+        """
         del self.__mem__[idx]
 
 
@@ -262,7 +267,8 @@ class Phy:
     """ Phy class that exposes spike sorting results and manual curation
     information
 
-    Args:
+    Parameters
+    ----------
         root (string): path to phy folder
     """
 

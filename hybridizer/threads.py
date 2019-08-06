@@ -23,12 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-import os
 import numpy as np
 
 from PyQt5.QtCore import QThread, pyqtSignal
 
-from hybridizer.io import SpikeClusters
 from hybridizer.spikes import SpikeTrain
 from hybridizer.hybrid import Insert, Subtract
 

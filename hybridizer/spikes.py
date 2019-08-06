@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Sep 12 13:52:29 2018
-
-@author: Jasper Wouters
-
 SHYBRID
 Copyright (C) 2018  Jasper Wouters
 
@@ -20,7 +16,6 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 """
 
 import numpy as np
@@ -28,10 +23,15 @@ import numpy as np
 class SpikeTrain:
     """ Spike train class grouping spikes and recording
 
-    Args:
+    Parameters
+    ----------
         recording (Recording): recording object related to this spike train
 
         spike_times (ndarray): array containing times of every spike
+
+        template (Template): optional template, if already known
+
+        template_fitting (ndarray): optional template fitting (same size as spike times)
     """
 
     def __init__(self, recording, spike_times, template=None,
@@ -255,9 +255,13 @@ class SpikeTrain:
         self._PSNR = None
 
     def forget_recording(self):
+        """ Forget about the current recording associated with self
+        """
         self.recording = None
 
     def add_recording(self, recording):
+        """ Add the given recording object to self
+        """
         self.recording = recording
 
 class Template:

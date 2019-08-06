@@ -8,17 +8,16 @@ Created on Wed Jul 10 15:13:36 2019
 
 import numpy as np
 
+# TODO merge probe models
 class Probe:
     """ Class exposing the probe file. Supporting only single-shank 
-    with shank id 1.
+    with shank id **1**.
 
-    Args:
+    TODO: automatically determine shank ID and raise error if not single-shank
+
+    Parameters
+    ----------
         probe_fn (string): full path and filename to the probe file
-
-    Attributes:
-        channels (ndarray): array containing the good channels
-
-        total_nb_channels (int): total number of channels on the probe
     """
 
     def __init__(self, probe_fn):
@@ -125,11 +124,6 @@ class Probe:
 class RectangularProbe:
     """ A model for probes that have a rectangular electrode grid. Automatic
     probe graph generation supported.
-
-    Attributes:
-        channels (ndarray) : array containing the channels
-
-        origin (Channel) : the origin channel of the probe
     """
 
     def __init__(self):
@@ -140,7 +134,8 @@ class RectangularProbe:
         """ Fill the channels attribute with channel objects generated from
         the given channels geometries dictionary
 
-        Args:
+        Parameters
+        ----------
             channel_geometries (dict) : dictionary containing the coordinates
             for every channel
         """
@@ -414,14 +409,16 @@ class RectangularProbe:
 class Channel:
     """ A channel class with neighbor support
 
-    Args:
+    Parameters
+    ----------
         x (float) : x-coordinate
 
         y (float) : y-coordinate
 
         channel (int) : corresponding channel id in the recording data
 
-    Attributes:
+    Attributes
+    ----------
         x (float) : x-coordinate
 
         y (float) : y-coordinate
@@ -435,8 +432,6 @@ class Channel:
         lower (Channel) : lower neighboring channel (negative y direction)
 
         upper (Channel) : upper neighboring channel (positive x direction)
-
-        broken (bool) : boolean indicating broken channels
     """
 
     def __init__(self, x, y, channel=None, broken=False):
