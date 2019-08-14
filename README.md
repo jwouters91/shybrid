@@ -86,7 +86,7 @@ clusters:
 ```
 
 ### Creating a ground truth spike train the regular way
-An example dataset (with csv initial sorting results) for experimentation can be download from [here](https://cloud.esat.kuleuven.be/index.php/s/iW9gtkibJknCpos). Don't forget to complete the paths in the parameters file to correspond to the true location of the downloaded data on your local machine. Note: try to avoid spaces in the paths.
+An example dataset (with csv initial sorting results) for experimentation can be download from [here](https://cloud.esat.kuleuven.be/index.php/s/iW9gtkibJknCpos). Don't forget to complete the paths in the parameters file to correspond to the true location of the downloaded data on your local machine. __Note__: try to avoid spaces in the paths. __Note 2__: Every binary recording that has to be processed by the SHYBRID has to be kept in its own subfolder, the reason for this is that SHYBRID keeps track of the hybridization process (by outputting the ground truth labels and a binary file that supports cross-session undo functionality). Keeping multiple recordings in the same subfolder, will overwrite those files that keep track of the ground truth and will render the generated hybrid data useless.
 
 1. Start the application as explained in the installation instructions.
 
