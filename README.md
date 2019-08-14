@@ -34,7 +34,7 @@ Keep in mind that the program is only accessible from within the shybrid conda e
 Since the package is installed in editable mode, the package can be simply updated by pulling the latest version of the git master branch.
 
 ## Getting started with generating hybrid data using SHYBRID
-Besides the information given here, more details on the methods used by the tool can be found in the [manuscript](#).
+Besides the information given here, more details on the methods used by the tool can be found in the preprint version of our [manuscript](http://biorxiv.org/cgi/content/short/734061v1).
 
 ![alt text](img/screenshot.png "inspecting a template fit")
 
