@@ -27,6 +27,8 @@ from hybridizer.spikes import SpikeTrain
 from hybridizer.hybrid import HybridCluster
 from hybridizer.probes import Probe
 
+import yaml
+
 class Recording:
     """ Recording in binary format. The raw recording is memory-mapped on
     initialization.
@@ -351,3 +353,17 @@ class Phy:
         """ Return all spike times
         """
         return np.load(self._get_path_to(Phy._SPIKE_TIMES)).flatten()
+
+def get_params(binary_fn):
+    """ Return yaml parameters given the binary recording full file name
+    """
+    base_fn, _ = os.path.splitext(binary_fn)
+    params_fn = base_fn + '.yml'
+
+    if os.path.isfile(params_fn):
+        with open(params_fn, 'r') as f:
+            params = yaml.load(f)
+    else:
+        raise FileNotFoundError('the parameters file "{}" could not be found'.format(params_fn))
+
+    return params
