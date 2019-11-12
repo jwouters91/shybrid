@@ -6,6 +6,8 @@ Created on Mon Sep 30 13:04:03 2019
 @author: Jasper Wouters
 """
 
+import hybridizer.io as sbio
+
 import spikeinterface.extractors as se
 import spikeinterface.sorters as ss
 import spikeinterface.comparison as sc
@@ -13,10 +15,12 @@ import spikeinterface.comparison as sc
 # full filenames to both the hybrid recording and ground truth
 recording_fn = '/path/to/recording.bin'
 gt_fn = '/path/to/hybrid_GT.csv'
+params = sbio.get_params(recording_fn)
 
 # create extractor object for both the recording data and ground truth labels
-# NOTE: at this moment the extractors are only available via the jwouters91 spikeextractors fork
 recording_ex = se.SHYBRIDRecordingExtractor(recording_fn)
+recording_ex = recording_ex.load_probe_file(params['data']['probe'])
+
 sorting_ex = se.SHYBRIDSortingExtractor(gt_fn)
 
 # perform spike sorting (e.g., using spyking circus)
