@@ -40,7 +40,7 @@ def validate_from_phy(gt_csv_fn, phy_sorting_path, comparison_window=30):
     gt = SortingResults.fromCSV(gt_csv_fn)
     sorting = SortingResults(Phy(phy_sorting_path).get_cluster_and_times())
 
-    validate(gt, sorting)
+    validate(gt, sorting, comparison_window=comparison_window)
 
 def validate_from_csv(gt_csv_fn, sorting_csv_fn, comparison_window=30):
     """ Compare spike sorting results (in csv format) with a hybird ground
@@ -60,7 +60,7 @@ def validate_from_csv(gt_csv_fn, sorting_csv_fn, comparison_window=30):
     gt = SortingResults.fromCSV(gt_csv_fn)
     sorting = SortingResults.fromCSV(sorting_csv_fn)
 
-    validate(gt, sorting)
+    validate(gt, sorting, comparison_window=comparison_window)
 
 def validate(gt, sorting, comparison_window=30):
     """ Compare spike sorting results with a hybird ground
