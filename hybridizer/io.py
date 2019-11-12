@@ -275,6 +275,7 @@ class Phy:
     """
 
     _SPIKE_CLUSTERS  = 'spike_clusters.npy'
+    _SPIKE_TEMPLATES = 'spike_templates.npy'
     _SPIKE_TIMES = 'spike_times.npy'
     _CLUSTER_GROUPS = 'cluster_groups.csv'
 
@@ -320,7 +321,7 @@ class Phy:
 
         return spike_times
 
-    def get_cluster_and_times(self):
+    def get_cluster_and_times(self, curated=True):
         """
         Returns
         -------
@@ -328,7 +329,12 @@ class Phy:
         first column the cluster and in the second column the time of all
         spikes
         """
-        spike_clusters = np.load(self._get_path_to(Phy._SPIKE_CLUSTERS)).flatten()
+        # spike_clusters only exists after curation
+        if curated:
+            spike_clusters = np.load(self._get_path_to(Phy._SPIKE_CLUSTERS)).flatten()
+        else:
+            spike_clusters = np.load(self._get_path_to(Phy._SPIKE_TEMPLATES)).flatten()
+
         spike_times = np.load(self._get_path_to(Phy._SPIKE_TIMES)).flatten()
 
         return np.concatenate((spike_clusters[:,np.newaxis],

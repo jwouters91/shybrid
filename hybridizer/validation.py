@@ -38,7 +38,7 @@ def validate_from_phy(gt_csv_fn, phy_sorting_path, comparison_window=30):
     time stamps and the ground truth.
     """
     gt = SortingResults.fromCSV(gt_csv_fn)
-    sorting = SortingResults(Phy(phy_sorting_path).get_cluster_and_times())
+    sorting = SortingResults(Phy(phy_sorting_path).get_cluster_and_times(curated=False))
 
     validate(gt, sorting, comparison_window=comparison_window)
 
