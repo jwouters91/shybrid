@@ -37,15 +37,21 @@ class Probe:
         # execute the probe file
         exec(open(probe_fn).read(), variables)
 
+        channel_groups = list(variables['channel_groups'].keys())
+
+        if len(channel_groups) != 1:
+            raise ValueError("Probe file can only have one channel group")
+        channel_group = channel_groups[0]
+
         # extract channels from probe
-        self.channels = variables['channel_groups'][1]['channels']
+        self.channels = variables['channel_groups'][channel_group]['channels']
         self.channels = np.array(self.channels)
 
         # extract total number of channels
         self.total_nb_channels = variables['total_nb_channels']
 
         # extract geometry
-        self.geometry = variables['channel_groups'][1]['geometry']
+        self.geometry = variables['channel_groups'][channel_group]['geometry']
 
         # assuming rectangular probes with equal x spacing and equal y spacing
         self.x_between = self.get_x_between()
