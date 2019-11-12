@@ -278,6 +278,7 @@ class Phy:
     _SPIKE_TEMPLATES = 'spike_templates.npy'
     _SPIKE_TIMES = 'spike_times.npy'
     _CLUSTER_GROUPS = 'cluster_groups.csv'
+    _CLUSTER_GROUPS_V2 = 'cluster_group.tsv'
 
     def __init__(self, root):
         self.root = root
@@ -285,7 +286,17 @@ class Phy:
     def get_good_clusters(self):
         """ Return all clusters labeled good
         """
-        with open(self._get_path_to(Phy._CLUSTER_GROUPS), 'r') as csvfile:
+        V1_exists = os.path.isfile(self._get_path_to(Phy._CLUSTER_GROUPS))
+        V2_exists = os.path.isfile(self._get_path_to(Phy._CLUSTER_GROUPS_V2))
+
+        if V1_exists:
+            cluster_groups_fn = self._get_path_to(Phy._CLUSTER_GROUPS)
+        elif V2_exists:
+            cluster_groups_fn = self._get_path_to(Phy._CLUSTER_GROUPS_V2)
+        else:
+            raise FileNotFoundError("Phy cluster groups could not be found")
+
+        with open(cluster_groups_fn, 'r') as csvfile:
              csv_reader = csv.reader(csvfile, delimiter='\t')
              groups = []
              labels = []
