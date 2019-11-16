@@ -8,8 +8,6 @@ Created on Mon Sep 30 13:04:03 2019
 
 import os
 
-import hybridizer.io as sbio
-
 import spikeinterface.extractors as se
 import spikeinterface.sorters as ss
 import spikeinterface.comparison as sc
@@ -26,16 +24,14 @@ hybrid ground truth data.
 # full filenames to both the hybrid recording and ground truth
 recording_fn = '/path/to/recording.bin'
 gt_fn = '/path/to/hybrid_GT.csv'
-params = sbio.get_params(recording_fn)
 
 # create extractor object for both the recording data and ground truth labels
 recording_ex = se.SHYBRIDRecordingExtractor(recording_fn)
-recording_ex = recording_ex.load_probe_file(params['data']['probe'])
 sorting_ex = se.SHYBRIDSortingExtractor(gt_fn)
 
 # Now we will write create SHYBRID compatible data from a recording and sorting
 # extractor
-output_folder = '/tmp/spikeinterface_conversion'
+output_folder = '/path/to/spikeinterface_conversion'
 
 se.SHYBRIDSortingExtractor.write_sorting(sorting_ex,output_folder)
 initial_sorting_fn = os.path.join(output_folder, 'initial_sorting.csv')
@@ -47,10 +43,8 @@ se.SHYBRIDRecordingExtractor.write_recording(recording_ex, output_folder,
 # purposes
 recording_fn_conv = os.path.join(output_folder, 'recording.bin')
 sorting_fn_conv = os.path.join(output_folder, 'initial_sorting.csv') # which is effectively the ground truth by construction in this example
-params_conv = sbio.get_params(recording_fn_conv)
 
 recording_ex_conv = se.SHYBRIDRecordingExtractor(recording_fn_conv)
-recording_ex_conv = recording_ex_conv.load_probe_file(params_conv['data']['probe'])
 sorting_ex_conv = se.SHYBRIDSortingExtractor(sorting_fn_conv)
 
 # perform spike sorting (e.g., using spyking circus)
