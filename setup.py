@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
-from distutils.core import setup
+from setuptools import setup
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(name='shybrid',
-      version='0.2.1',
+      version='0.2.2',
       description='A graphical tool for generating hybrid ground-truth spiking data for evaluating spike sorting performance',
       author='Jasper Wouters',
       author_email='jasper.wouters@esat.kuleuven.be',
