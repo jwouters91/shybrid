@@ -2,11 +2,24 @@
 
 from distutils.core import setup
 
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
 setup(name='hybridizer',
-      version='0.2',
-      description='Hybrid Data Generator',
+      version='0.2.1',
+      description='A graphical tool for generating hybrid ground-truth spiking data for evaluating spike sorting performance',
       author='Jasper Wouters',
       author_email='jasper.wouters@esat.kuleuven.be',
+      long_description=long_description,
+      long_description_content_type='text/markdown',
+      url='https://github.com/jwouters91/shybrid',
       packages=['hybridizer', 'hybridizer.ui'],
       scripts=['shybrid.py'],
+      classifiers=[
+          'Programming Language :: Python :: 3',
+          'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
+          'Operating System :: OS Independent',
+      ],
+      python_requires='>=3.6',
+      install_requires=['numpy', 'scipy', 'PyQt5', 'PyYAML', 'matplotlib']
      )

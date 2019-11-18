@@ -4,28 +4,22 @@ SHYBRID is a graphical user interface that allows for the easy creation of hybri
 Note that the tool was developed on Linux and prefereably you also run it on Linux, although it has been tested both on Windows (10) and OS X. The tool seems to be functional on both alternative operating systems, but some warnings might pop-up that seem to be harmless.
 
 ## Installation instructions
-1. Install miniconda (Python 3.x version) for your operating system. Please follow the official conda.io [instructions](https://conda.io/projects/conda/en/latest/user-guide/install/).
-2. Clone this GIT project on your local machine and change directory into the cloned folder when finished cloning:
+1. Install miniconda (Python 3.x version) for your operating system if you don't already have it installed. Please follow the official conda.io [instructions](https://conda.io/projects/conda/en/latest/user-guide/install/).
+2. Optional, yet recommended: create a virtual environment for SHYBRID:
 ```
-https://gitlab.esat.kuleuven.be/Jasper.Wouters/shybrid.git
+conda create -n shybrid
 ```
-3. Create a conda environment for SHYBRID:
-```
-conda create -n shybrid --file requirements
-```
-Or use requirements_strict to enforce the exact package versions used for testing.
-
-4. Activate the environment:
+3. Activate the environment:
 ```
 conda activate shybrid
 ```
-5. Install shybrid package (be considerate of the trailing period in the command shown below):
+5. Install the hybridizer package that contains shybrid:
 ```
-pip install --editable .
+pip install hybridizer
 ```
-6. To run the application execute the following command:
+6. To run the application execute the shybrid command, as it has been added to your path (extension has been added, because windows doesn't support shebang):
 ```
-python shybrid.py
+shybrid.py
 ```
 
 Keep in mind that the program is only accessible from within the shybrid conda environment (i.e., reactivate this environment after ,e.g., a reboot).
