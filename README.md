@@ -4,28 +4,25 @@ SHYBRID is a graphical user interface that allows for the easy creation of hybri
 Note that the tool was developed on Linux and prefereably you also run it on Linux, although it has been tested both on Windows (10) and OS X. The tool seems to be functional on both alternative operating systems, but some warnings might pop-up that seem to be harmless.
 
 ## Installation instructions
-1. Install miniconda (Python 3.x version) for your operating system if you don't already have it installed. Please follow the official conda.io [instructions](https://conda.io/projects/conda/en/latest/user-guide/install/).
+1. Install miniconda (Python 3.x version) (or another python distribution) for your operating system, if you didn't already install it. Please follow the official conda.io [instructions](https://conda.io/projects/conda/en/latest/user-guide/install/).
 2. Optional, yet recommended: create a virtual environment for SHYBRID:
 ```
-conda create -n shybrid
+conda create -n shybrid_env
 ```
 3. Activate the environment:
 ```
-conda activate shybrid
+conda activate shybrid_env
 ```
-5. Install the hybridizer package that contains shybrid:
+5. Install the shybrid using pip:
 ```
-pip install hybridizer
+pip install shybrid
 ```
-6. To run the application execute the shybrid command, as it has been added to your path (extension has been added, because windows doesn't support shebang):
+6. To run the application execute the shybrid command, it has been added to your path (extension has been kept, because windows doesn't support shebang):
 ```
 shybrid.py
 ```
 
 Keep in mind that the program is only accessible from within the shybrid conda environment (i.e., reactivate this environment after ,e.g., a reboot).
-
-## Updating
-Since the package is installed in editable mode, the package can be simply updated by pulling the latest version of the git master branch.
 
 ## Getting started with generating hybrid data using SHYBRID
 Besides the information given here, more details on the methods used by the tool can be found in the preprint version of our [manuscript](http://biorxiv.org/cgi/content/short/734061v1).

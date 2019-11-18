@@ -5,7 +5,7 @@ from distutils.core import setup
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-setup(name='hybridizer',
+setup(name='shybrid',
       version='0.2.1',
       description='A graphical tool for generating hybrid ground-truth spiking data for evaluating spike sorting performance',
       author='Jasper Wouters',
