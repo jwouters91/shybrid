@@ -17,9 +17,9 @@ conda activate shybrid_env
 ```
 pip install shybrid
 ```
-5. To run the application execute the shybrid command, it has been added to your path (extension has been kept, because windows doesn't support shebang):
+5. To run the application execute the shybrid command:
 ```
-shybrid.py
+shybrid
 ```
 
 Keep in mind that the program is only accessible from within the shybrid conda environment (i.e., reactivate this environment after ,e.g., a reboot).

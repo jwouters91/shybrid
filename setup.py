@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(name='shybrid',
-      version='0.2.3',
+      version='0.2.4',
       description='A graphical tool for generating hybrid ground-truth spiking data for evaluating spike sorting performance',
       author='Jasper Wouters',
       author_email='jasper.wouters@esat.kuleuven.be',
