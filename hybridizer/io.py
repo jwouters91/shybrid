@@ -207,7 +207,8 @@ class SpikeClusters:
             cluster_spike_times = cluster_info[cluster_mask,1]
             cluster_spike_times.sort()
 
-            spike_train = SpikeTrain(recording, cluster_spike_times)
+            spike_train = SpikeTrain(recording, cluster_spike_times,
+                                     template_jitter=np.zeros(cluster_spike_times.size))
 
             self[cluster] = HybridCluster(cluster, spike_train)
 
@@ -238,7 +239,8 @@ class SpikeClusters:
         for cluster in phy.get_good_clusters():
             cluster_spike_times = phy.get_cluster_activation(cluster)
 
-            spike_train = SpikeTrain(recording, cluster_spike_times)
+            spike_train = SpikeTrain(recording, cluster_spike_times,
+                                     template_jitter=np.zeros(cluster_spike_times.size))
 
             self[cluster] = HybridCluster(cluster, spike_train)
 

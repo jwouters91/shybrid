@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import numpy as np
+import scipy.signal as sg
 
 class SpikeTrain:
     """ Spike train class grouping spikes and recording
@@ -31,16 +32,37 @@ class SpikeTrain:
 
         template (Template): optional template, if already known
 
-        template_fitting (ndarray): optional template fitting (same size as spike times)
+        template_fitting (ndarray): optional template fitting (same size as spike_times)
+
+        template_jitter (ndarray): optional template jitter (same size as spike_times), default is random jitter
+
+        upsampling_factor (int) : template upsampling factor, default is 10
     """
 
     def __init__(self, recording, spike_times, template=None,
-                 template_fitting=None):
+                 template_fitting=None, template_jitter=None,
+                 upsampling_factor=10):
         self.recording = recording
         self.spikes = spike_times
         self.template = template
 
         self._template_fitting = template_fitting
+
+        # if no jitter vector is given, a random jitter vector is constructed
+        if template_jitter is None:
+            if upsampling_factor % 2 == 0:
+                low = -upsampling_factor // 2 + 1
+            else:
+                low = -upsampling_factor // 2
+
+            high = upsampling_factor // 2 + 1 # exclusive
+
+            self._template_jitter = np.random.randint(low, high=high,
+                                                      size=spike_times.size)
+        else:
+            self._template_jitter = template_jitter
+
+        self._upsampling_factor = upsampling_factor
 
         self._energy_sorted_idxs = None
         self._PSNR = None
@@ -85,11 +107,14 @@ class SpikeTrain:
             start, end = self.get_spike_start_end(spike)
 
             temp_fit = self._template_fitting[idx]
+            jitter = self._template_jitter[idx]
 
             if temp_fit == 0:
                 continue
 
-            fitted_waveform = self.template.get_fitted_waveform(temp_fit)
+            fitted_waveform = self.template.get_fitted_waveform(temp_fit,
+                                                                jitter,
+                                                                self._upsampling_factor)
 
             # subtract
             self.recording.data[channels, start:end] = \
@@ -104,11 +129,14 @@ class SpikeTrain:
             start, end = self.get_spike_start_end(spike)
 
             temp_fit = self._template_fitting[idx]
+            jitter = self._template_jitter[idx]
 
             if temp_fit == 0:
                 continue
 
-            fitted_waveform = self.template.get_fitted_waveform(temp_fit)
+            fitted_waveform = self.template.get_fitted_waveform(temp_fit,
+                                                                jitter,
+                                                                self._upsampling_factor)
 
             # insert
             self.recording.data[channels, start:end] = \
@@ -396,10 +424,10 @@ class Template:
 
         return fit
 
-    def get_fitted_waveform(self, template_fit):
+    def get_fitted_waveform(self, template_fit, jitter, upsampling_factor):
         """ Return fitted waveform
         """
-        return template_fit * self.get_template_data()
+        return template_fit * self.get_jittered(jitter, upsampling_factor)
 
     def get_max_channel_idx(self):
         """ Return the index of the maximum peak energy channel in the good
@@ -412,3 +440,24 @@ class Template:
         template peak energy
         """
         return np.argmax(np.max(np.abs(self.get_template_data()), axis=1))
+
+    def get_jittered(self, jitter, upsampling_factor):
+        """ return a jittered template
+        """
+        assert jitter < upsampling_factor, "jitter should be less than upsampling factor"
+
+        template_data = self.get_template_data()
+        duration = template_data.shape[1]
+
+        # extend data with a zero at the left
+        template_data_ext = np.concatenate((np.zeros((template_data.shape[0],1)),
+                                            template_data),
+                                           axis=1)
+
+        idxs = np.arange(duration) * upsampling_factor + jitter + upsampling_factor
+        idxs = idxs.astype(np.int)
+
+        upsampled_template = sg.resample_poly(template_data_ext, upsampling_factor,
+                                              1, axis=1)
+
+        return upsampled_template[:,idxs]
