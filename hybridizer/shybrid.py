@@ -37,7 +37,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
-from hybridizer.ui import design, import_template, insert_template
+from hybridizer.ui import design, import_template, insert_template, select_auto
 from hybridizer.io import Recording, SpikeClusters, Phy
 from hybridizer.probes import RectangularProbe
 from hybridizer.spikes import SpikeTrain, Template
@@ -389,10 +389,15 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
     """ Auto hybrid
     """
     def auto_hybrid(self):
+        """ Show import template dialog
+        """
+        # build on the fly
+        self.build_cluster_select_dialog()
+
+    def auto_hybrid_run(self, clusters):
         """ Automatically generate ground truth
         """
         if self.is_window_size_valid():
-            clusters = self.clusters.keys()
             for cluster in clusters:
                 self._current_cluster = cluster
 
@@ -415,6 +420,37 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
 
                 self.execute_move()
                 self.magicEventLoop.exec()
+
+    def build_cluster_select_dialog(self):
+        """ Build the graphical template import dialog
+        """
+        self.clusterSelectContainer = QtWidgets.QDialog(self)
+        # constructor does nothing
+        self.clusterSelectDialog = select_auto.Ui_AutoSelect()
+        self.clusterSelectDialog.setupUi(self.clusterSelectContainer)
+
+        self.clusterSelectDialog.listWidget.addItems(self.good_clusters[1:])
+
+        for idx in range(self.clusterSelectDialog.listWidget.count()):
+            self.clusterSelectDialog.listWidget.item(idx).setSelected(True)
+
+        # prevent dialog resize
+        self.clusterSelectContainer.setFixedSize(self.clusterSelectContainer.size())
+
+        # connect listener
+        self.clusterSelectDialog.buttonBox.accepted.connect(self.accept_cluster_select)
+
+        self.clusterSelectContainer.exec()
+
+    def accept_cluster_select(self):
+        selected_clusters = self.clusterSelectDialog.listWidget.selectedItems()
+
+        clusters_int = []
+        for idx in range(len(selected_clusters)):
+            clusters_int.append(int(selected_clusters[idx].text()))
+
+        self.auto_hybrid_run(clusters_int)
+
 
     """
     Methods related to the template only view
