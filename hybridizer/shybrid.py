@@ -480,6 +480,7 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
 
             # draw template
             self.axes.clear()
+            self._template_scaling = self.plot_multichannel(np.zeros(self.spikeTrain.template.get_template_data().shape))
             self._template_scaling = self.plot_multichannel(self.spikeTrain.template.get_template_data())
             self.axes.autoscale(False)
 
