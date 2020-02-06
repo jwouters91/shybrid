@@ -1,4 +1,6 @@
 # SHYBRID README
+For more detailed user information consult our [SHYBRID Read the Docs pages](https://shybrid.readthedocs.io/).
+
 SHYBRID is a graphical user interface that allows for the easy creation of hybrid ground truth extracellular recordings. This README file contains information on how to install the program, as well as information on how to get started making extracellular spiking ground truth data. If you have any further questions feel free to contact [me](mailto:jasper.wouters@esat.kuleuven.be).
 
 Note that the tool was developed on Linux and prefereably you also run it on Linux, although it has been tested both on Windows (10) and OS X. The tool seems to be functional on both alternative operating systems, but some warnings might pop-up that seem to be harmless.
