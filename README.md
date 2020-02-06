@@ -9,7 +9,7 @@ Note that the tool was developed on Linux and prefereably you also run it on Lin
 1. Install miniconda (Python 3.x version) (or another python distribution) for your operating system, if you didn't already install it. Please follow the official conda.io [instructions](https://conda.io/projects/conda/en/latest/user-guide/install/).
 2. Optional, yet recommended: create a virtual environment for SHYBRID:
 ```
-conda create -n shybrid_env
+conda create -n shybrid_env python=3
 ```
 3. Activate the environment:
 ```

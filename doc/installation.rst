@@ -8,7 +8,7 @@ The remaining SHYBRID installation commands have to executed in the (Anaconda) t
 
 2. Optional, yet recommended, create a virtual environment for SHYBRID::
 
-   >> conda create -n shybrid_env
+   >> conda create -n shybrid_env python=3
 
    and activate the newly created environment::
 
