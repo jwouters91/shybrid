@@ -461,3 +461,21 @@ class Template:
                                               1, axis=1)
 
         return upsampled_template[:,idxs]
+
+    def check_template_edges_to_zero(self, tol=0.1):
+        """ Check whether the mean edges of the template are sufficiently close
+        to zero, sufficiently close is determined as the given tolerance (tol)
+        times the mean absolute maximum of the template.
+        """
+        active_channels = self.get_template_data().sum(axis=1) != 0
+        active_slice = np.abs(self.get_template_data()[active_channels])
+
+        template_max = active_slice.max(axis=1).mean()
+
+        left_boundaries = np.abs(active_slice[:,0])
+        left_check = left_boundaries.mean() < (tol * template_max)
+
+        right_boundaries = np.abs(active_slice[:,-1])
+        right_check = right_boundaries.mean() < (tol * template_max)
+
+        return left_check and right_check

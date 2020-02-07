@@ -524,6 +524,12 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
             self.axes.callbacks.connect('ylim_changed', self.lim_changed)
             self.axes.callbacks.connect('xlim_changed', self.lim_changed)
 
+            # check template to zero
+            if not self.spikeTrain.template.check_template_edges_to_zero():
+                QtWidgets.QMessageBox.information(self, 'window size warning',
+                                                  'Consider increasing the window size, because the template edges are not reaching close to zero. '\
+                                                  'This message can be ignored when working with noisy templates.')
+
             # enable options for further use
             self.radioTemplate.setChecked(True)
             self.radioTemplate.setEnabled(True)
