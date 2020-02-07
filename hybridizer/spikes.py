@@ -373,16 +373,24 @@ class Template:
             geo_x = geo[0] - x_shift * x_between
             geo_y = geo[1] - y_shift * y_between
 
-            # if this location is not located on the probe we can continue
-            # this prevents extrapolation from happening
-            if geo_x < spike_train.recording.probe.x_min:
+            # skip off probe locations apart from the edges
+            if geo_x < spike_train.recording.probe.x_min - x_between:
                 continue
-            if geo_x > spike_train.recording.probe.x_max:
+            if geo_x > spike_train.recording.probe.x_max + x_between:
                 continue
-            if geo_y < spike_train.recording.probe.y_min:
+            if geo_y < spike_train.recording.probe.y_min - y_between:
                 continue
-            if geo_y > spike_train.recording.probe.y_max:
+            if geo_y > spike_train.recording.probe.y_max + y_between:
                 continue
+
+            # determine if extrapolation is needed
+            if geo_x < spike_train.recording.probe.x_min or \
+                geo_x > spike_train.recording.probe.x_max or \
+                    geo_y < spike_train.recording.probe.y_min or \
+                        geo_y > spike_train.recording.probe.y_max:
+                extrapolate = True
+            else:
+                extrapolate = False
 
             # initialize interpolated waveform
             interpolated_waveform = np.zeros(spike_train.template._data[0].shape)
@@ -403,6 +411,8 @@ class Template:
                         interpolation_count += 1
 
             if interpolation_needed and interpolation_count > 0:
+                if extrapolate:
+                    interpolation_count *= 2
                 shifted_template[idx] = interpolated_waveform / interpolation_count
 
         return Template(data=shifted_template, zf_frac=self._zf_frac)
