@@ -1,20 +1,10 @@
-"""
-SHY BRIDE
-Copyright (C) 2018  Jasper Wouters
+# -*- coding: utf-8 -*-
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
+# Form implementation generated from reading ui file 'hybridizer.ui'
+#
+# Created by: PyQt5 UI code generator 5.5.1
+#
+# WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
@@ -376,7 +366,7 @@ class Ui_ShyBride(object):
         self.btnRightSpike.setText(_translate("ShyBride", "→"))
         self.checkBoxLower.setText(_translate("ShyBride", "set fitting factor lower bound"))
         self.checkBoxUpper.setText(_translate("ShyBride", "set fitting factor upper bound"))
-        self.radioMove.setText(_translate("ShyBride", "relocate spike train"))
+        self.radioMove.setText(_translate("ShyBride", "relocate unit"))
         self.btnMoveLeft.setText(_translate("ShyBride", "←"))
         self.btnMoveUp.setText(_translate("ShyBride", "↑"))
         self.btnReset.setText(_translate("ShyBride", "reset"))
