@@ -9,7 +9,7 @@ A subset of channels can be exported by using the zoom functionality. All channe
 
 Importing template
 ------------------
-Ground truth data can also be generated in the absence of initial spike sorting results for a certain recording. This can be obtained by importing an external template in CSV-format, where every row in the CSV-file represents the waveform on a channel. The window size is automatically determined. The horizontal reach parameter will control the width (i.e., the number of channels in the x-direction) of the template on the probe. The offset parameter allows more control about which channel is used as a starting point. The template can also be shaped by adding additional zero-channels to the CSV.
+Ground truth data can also be generated in the absence of initial spike sorting results for a certain recording. This can be obtained by importing an external template in CSV-format, where every row in the CSV-file represents the waveform on a channel. The window size is automatically determined. The template spatial width parameter will control the width (i.e., the number of channels in the x-direction) of the template on the probe. The horizontal starting index parameter allows more control over which channel is used as a starting point. The template can also be shaped by adding additional zero-channels to the CSV.
 
 When working with an imported template, the inspect template fit feature will be disabled until a spatial location is chosen and the template is actually inserted in the recording.
 
