@@ -25,5 +25,5 @@ setup(name='shybrid',
           'Operating System :: OS Independent',
       ],
       python_requires='>=3.6',
-      install_requires=['numpy', 'scipy', 'PyQt5==5.13', 'PyYAML', 'matplotlib']
+      install_requires=['numpy', 'scipy', 'PyQt5==5.13', 'PyYAML', 'matplotlib==3.1.2']
      )
