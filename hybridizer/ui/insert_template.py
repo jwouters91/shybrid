@@ -1,5 +1,5 @@
 """
-SHY BRIDE
+SHYBRID
 Copyright (C) 2018  Jasper Wouters
 
 This program is free software: you can redistribute it and/or modify

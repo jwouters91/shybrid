@@ -1,5 +1,5 @@
 """
-SHY BRIDE
+SHYBRID
 Copyright (C) 2018  Jasper Wouters
 
 This program is free software: you can redistribute it and/or modify
@@ -376,7 +376,7 @@ class Ui_ShyBride(object):
         self.btnRightSpike.setText(_translate("ShyBride", "→"))
         self.checkBoxLower.setText(_translate("ShyBride", "set fitting factor lower bound"))
         self.checkBoxUpper.setText(_translate("ShyBride", "set fitting factor upper bound"))
-        self.radioMove.setText(_translate("ShyBride", "relocate spike train"))
+        self.radioMove.setText(_translate("ShyBride", "relocate unit"))
         self.btnMoveLeft.setText(_translate("ShyBride", "←"))
         self.btnMoveUp.setText(_translate("ShyBride", "↑"))
         self.btnReset.setText(_translate("ShyBride", "reset"))

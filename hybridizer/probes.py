@@ -376,10 +376,10 @@ class RectangularProbe:
         output_idxs = np.array([], dtype=np.int)
 
         if x_offset >= x_reach:
-            raise Exception('Given offset has to smaller than the given reach')
+            raise Exception('Given starting index has to smaller than the given width')
 
         if x_reach > self.nb_cols:
-            raise Exception('Given reach cannot exceed the probe dimensions')
+            raise Exception('Given width cannot exceed the probe dimensions')
 
         # go to start
         current_channel = self.origin

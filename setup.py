@@ -1,12 +1,29 @@
 #!/usr/bin/env python
 
-from distutils.core import setup
+from setuptools import setup
 
-setup(name='hybridizer',
-      version='0.2',
-      description='Hybrid Data Generator',
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
+setup(name='shybrid',
+      version='0.3.0',
+      description='A graphical tool for generating hybrid ground-truth spiking data for evaluating spike sorting performance',
       author='Jasper Wouters',
       author_email='jasper.wouters@esat.kuleuven.be',
+      long_description=long_description,
+      long_description_content_type='text/markdown',
+      url='https://github.com/jwouters91/shybrid',
       packages=['hybridizer', 'hybridizer.ui'],
-      scripts=['shybrid.py'],
+      entry_points={
+          'gui_scripts': [
+              'shybrid = hybridizer.shybrid:main'
+          ]
+      },
+      classifiers=[
+          'Programming Language :: Python :: 3',
+          'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
+          'Operating System :: OS Independent',
+      ],
+      python_requires='>=3.6',
+      install_requires=['numpy', 'scipy', 'PyQt5==5.13', 'PyYAML', 'matplotlib']
      )

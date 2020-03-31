@@ -1,5 +1,5 @@
 """
-SHY BRIDE
+SHYBRID
 Copyright (C) 2018  Jasper Wouters
 
 This program is free software: you can redistribute it and/or modify
@@ -22,10 +22,10 @@ class Ui_DialogTemplateImport(object):
     def setupUi(self, DialogTemplateImport):
         DialogTemplateImport.setObjectName("DialogTemplateImport")
         DialogTemplateImport.setEnabled(True)
-        DialogTemplateImport.resize(402, 186)
+        DialogTemplateImport.resize(416, 186)
         self.buttonBox = QtWidgets.QDialogButtonBox(DialogTemplateImport)
         self.buttonBox.setEnabled(False)
-        self.buttonBox.setGeometry(QtCore.QRect(200, 140, 176, 27))
+        self.buttonBox.setGeometry(QtCore.QRect(285, 140, 91, 27))
         self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Ok)
         self.buttonBox.setCenterButtons(False)
         self.buttonBox.setObjectName("buttonBox")
@@ -38,28 +38,28 @@ class Ui_DialogTemplateImport(object):
         self.nbChannels.setText("")
         self.nbChannels.setObjectName("nbChannels")
         self.boxReach = QtWidgets.QSpinBox(DialogTemplateImport)
-        self.boxReach.setGeometry(QtCore.QRect(200, 70, 51, 27))
+        self.boxReach.setGeometry(QtCore.QRect(210, 70, 51, 27))
         self.boxReach.setMinimum(1)
         self.boxReach.setMaximum(99)
         self.boxReach.setProperty("value", 1)
         self.boxReach.setObjectName("boxReach")
         self.label_2 = QtWidgets.QLabel(DialogTemplateImport)
-        self.label_2.setGeometry(QtCore.QRect(40, 70, 121, 21))
+        self.label_2.setGeometry(QtCore.QRect(20, 70, 161, 21))
         self.label_2.setObjectName("label_2")
         self.label_4 = QtWidgets.QLabel(DialogTemplateImport)
-        self.label_4.setGeometry(QtCore.QRect(280, 70, 121, 21))
+        self.label_4.setGeometry(QtCore.QRect(290, 70, 91, 21))
         self.label_4.setObjectName("label_4")
         self.label_6 = QtWidgets.QLabel(DialogTemplateImport)
-        self.label_6.setGeometry(QtCore.QRect(40, 100, 121, 21))
+        self.label_6.setGeometry(QtCore.QRect(20, 100, 171, 21))
         self.label_6.setObjectName("label_6")
         self.boxOffset = QtWidgets.QSpinBox(DialogTemplateImport)
-        self.boxOffset.setGeometry(QtCore.QRect(200, 100, 51, 27))
+        self.boxOffset.setGeometry(QtCore.QRect(210, 100, 51, 27))
         self.boxOffset.setMinimum(0)
         self.boxOffset.setMaximum(99)
         self.boxOffset.setProperty("value", 0)
         self.boxOffset.setObjectName("boxOffset")
         self.label_7 = QtWidgets.QLabel(DialogTemplateImport)
-        self.label_7.setGeometry(QtCore.QRect(280, 100, 121, 21))
+        self.label_7.setGeometry(QtCore.QRect(290, 100, 111, 21))
         self.label_7.setObjectName("label_7")
 
         self.retranslateUi(DialogTemplateImport)
@@ -67,10 +67,10 @@ class Ui_DialogTemplateImport(object):
 
     def retranslateUi(self, DialogTemplateImport):
         _translate = QtCore.QCoreApplication.translate
-        DialogTemplateImport.setWindowTitle(_translate("DialogTemplateImport", "import template"))
+        DialogTemplateImport.setWindowTitle(_translate("DialogTemplateImport", "Import template"))
         self.btnSelectTemplate.setText(_translate("DialogTemplateImport", "Select template"))
-        self.label_2.setText(_translate("DialogTemplateImport", "horizontal reach"))
-        self.label_4.setText(_translate("DialogTemplateImport", "(channels)"))
-        self.label_6.setText(_translate("DialogTemplateImport", "horizontal offset"))
-        self.label_7.setText(_translate("DialogTemplateImport", "(channels)"))
+        self.label_2.setText(_translate("DialogTemplateImport", "template spatial width"))
+        self.label_4.setText(_translate("DialogTemplateImport", "(# channels)"))
+        self.label_6.setText(_translate("DialogTemplateImport", "horizontal starting index"))
+        self.label_7.setText(_translate("DialogTemplateImport", "(channel index)"))
 

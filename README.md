@@ -1,37 +1,30 @@
 # SHYBRID README
+For more detailed user information consult our [SHYBRID Read the Docs pages](https://shybrid.readthedocs.io/).
+
 SHYBRID is a graphical user interface that allows for the easy creation of hybrid ground truth extracellular recordings. This README file contains information on how to install the program, as well as information on how to get started making extracellular spiking ground truth data. If you have any further questions feel free to contact [me](mailto:jasper.wouters@esat.kuleuven.be).
 
 Note that the tool was developed on Linux and prefereably you also run it on Linux, although it has been tested both on Windows (10) and OS X. The tool seems to be functional on both alternative operating systems, but some warnings might pop-up that seem to be harmless.
 
 ## Installation instructions
-1. Install miniconda (Python 3.x version) for your operating system. Please follow the official conda.io [instructions](https://conda.io/projects/conda/en/latest/user-guide/install/).
-2. Clone this GIT project on your local machine and change directory into the cloned folder when finished cloning:
+1. Install miniconda (Python 3.x version) (or another python distribution) for your operating system, if you didn't already install it. Please follow the official conda.io [instructions](https://conda.io/projects/conda/en/latest/user-guide/install/).
+2. Optional, yet recommended: create a virtual environment for SHYBRID:
 ```
-https://gitlab.esat.kuleuven.be/Jasper.Wouters/shybrid.git
+conda create -n shybrid_env python=3
 ```
-3. Create a conda environment for SHYBRID:
+3. Activate the environment:
 ```
-conda create -n shybrid --file requirements
+conda activate shybrid_env
 ```
-Or use requirements_strict to enforce the exact package versions used for testing.
-
-4. Activate the environment:
+4. Install the shybrid using pip:
 ```
-conda activate shybrid
+pip install shybrid
 ```
-5. Install shybrid package (be considerate of the trailing period in the command shown below):
+5. To run the application execute the shybrid command:
 ```
-pip install --editable .
-```
-6. To run the application execute the following command:
-```
-python shybrid.py
+shybrid
 ```
 
 Keep in mind that the program is only accessible from within the shybrid conda environment (i.e., reactivate this environment after ,e.g., a reboot).
-
-## Updating
-Since the package is installed in editable mode, the package can be simply updated by pulling the latest version of the git master branch.
 
 ## Getting started with generating hybrid data using SHYBRID
 Besides the information given here, more details on the methods used by the tool can be found in the preprint version of our [manuscript](http://biorxiv.org/cgi/content/short/734061v1).
