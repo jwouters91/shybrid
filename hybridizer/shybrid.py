@@ -1036,6 +1036,12 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
         x_range = max_geo[0] - min_geo[0]
         y_range = max_geo[1] - min_geo[1]
 
+        if x_range == 0:
+            x_range = 1
+
+        if y_range == 0:
+            y_range = 1
+
         channels = np.array([])
 
         for idx, channel in enumerate(self.recording.probe.channels):
@@ -1287,6 +1293,12 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
 
         x_range = max_geo[0] - min_geo[0]
         y_range = max_geo[1] - min_geo[1]
+
+        if x_range == 0:
+            x_range = 1
+
+        if y_range == 0:
+            y_range = 1
 
         x_between = self.recording.probe.x_between
         y_between = self.recording.probe.y_between

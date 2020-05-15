@@ -265,8 +265,17 @@ class RectangularProbe:
                     if tmp_y_between > 0:
                         self.y_between = tmp_y_between
 
-        self.nb_cols = int((self.x_max - self.x_min) / self.x_between + 1)
-        self.nb_rows = int((self.y_max - self.y_min) / self.y_between + 1)
+        if self.x_between == -1:
+            self.x_between = 1 # arbitary positive
+            self.nb_cols = 1
+        else:
+            self.nb_cols = int((self.x_max - self.x_min) / self.x_between + 1)
+
+        if self.y_between == -1:
+            self.y_between = 1
+            self.nb_rows = 1
+        else:
+            self.nb_rows = int((self.y_max - self.y_min) / self.y_between + 1)
 
     def _is_neighbor(self, channel, candidate):
         """ Check whether the candidate is a neighbor of the given channel
