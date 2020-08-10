@@ -1,4 +1,6 @@
 __pycache__/
 build/
+dist/
+examples/
 *.egg-info/
 *.ui
