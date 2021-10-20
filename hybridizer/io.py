@@ -381,7 +381,7 @@ def get_params(binary_fn):
 
     if os.path.isfile(params_fn):
         with open(params_fn, 'r') as f:
-            params = yaml.load(f)
+            params = yaml.safe_load(f)
     else:
         raise FileNotFoundError('the parameters file "{}" could not be found'.format(params_fn))
 

@@ -237,7 +237,7 @@ class ShyBride(QtWidgets.QMainWindow, design.Ui_ShyBride):
                 self.reset_file_session_variables()
 
                 with open(config_fn, 'r') as f:
-                    config = yaml.load(f)
+                    config = yaml.safe_load(f)
 
                 # process config parameters
                 rec_params = config['data']
